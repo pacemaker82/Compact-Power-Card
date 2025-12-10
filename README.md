@@ -12,6 +12,15 @@ A compact power card for Home Assistant that supports a tighter user experience,
 - Grid & Battery sensorrs expect +/- values for import/export or charge/discharge.
 - Icons and Colors can be overriden.
 
+## Installation
+
+1. Goto HACS (if you dont have that installed, install HACS)
+2. Add a custom repository
+3. Add the URL to this repo: `https://github.com/pacemaker82/Compact-Power-Card` using the category `Dashboard` (used to be `Lovelace` pre HACS 2.0.0)
+4. Go back to HACS and search for "compact power card" in the HACS store
+5. Download and refresh
+6. Goto dashboard, edit dashboard, select 'add card' button, and add the new custom Compact Power Card. Use the configuration below to setup.
+
 ## Card Configuration:
 ```
 - type: custom:compact-power-card

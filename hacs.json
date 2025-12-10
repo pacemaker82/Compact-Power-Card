@@ -1,0 +1,7 @@
+{
+  "name": "Compact Power Card",
+  "content_in_root": true,
+  "filename": "compact-power-card.js",
+  "render_readme": true,
+  "country": ["GB"]
+}

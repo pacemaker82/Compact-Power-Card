@@ -8,7 +8,7 @@ A compact power card for Home Assistant that supports a tighter user experience,
 
 - Thresholds can be set on entities to fade out / hide the entity below the threshold.
 - Home power is calculated by default based on the grid/power/battery. You can force the raw state of the home sensor using config.
-- PV, Grid, Home and Battery are mandatory sensors needed at this time.
+- Grid, Home and Battery are mandatory sensors needed at this time. PV is optional.
 - Grid & Battery sensorrs expect +/- values for import/export or charge/discharge.
 - Icons and Colors can be overriden.
 

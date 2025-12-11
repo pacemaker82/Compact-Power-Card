@@ -40,6 +40,7 @@ A compact power card for Home Assistant that supports a tighter user experience,
         - entity: sensor.pv_energy_today_kwh
           icon: mdi:solar-power-variant-outline
           decimal_places: 2
+          color: "#FFFFFF"
     grid:
       entity: sensor.grid_power
       invert_state_values: true

@@ -1,5 +1,7 @@
 # Compact-Power-Card
 
+<img width="509" height="209" alt="Screenshot 2025-12-11 at 09 09 14" src="https://github.com/user-attachments/assets/b09648a2-8364-40b7-84fb-2475cc28d631" />
+
 <img width="513" height="211" alt="Screenshot 2025-12-10 at 12 27 40" src="https://github.com/user-attachments/assets/14b4b3f4-6fa3-4aa6-b56c-87ccf567c58d" />
 
 <img width="478" height="198" alt="Screenshot 2025-12-11 at 09 00 40" src="https://github.com/user-attachments/assets/c25e187b-ed8a-4973-aa86-eb7f367f29c3" />

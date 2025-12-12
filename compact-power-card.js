@@ -231,6 +231,27 @@ class CompactPowerCard extends (window.LitElement ||
         transform: translate(0, -50%);
       }
 
+      :host(.no-battery) #line-pv-battery,
+      :host(.no-battery) #line-home-battery,
+      :host(.no-battery) #arc-grid-battery,
+      :host(.no-battery) #dot-pv-battery,
+      :host(.no-battery) #dot-grid-battery,
+      :host(.no-battery) #dot-battery-home,
+      :host(.no-battery) #dot-battery-grid,
+      :host(.no-battery) .battery-section,
+      :host(.no-battery) .battery-label,
+      ha-card.no-battery #line-pv-battery,
+      ha-card.no-battery #line-home-battery,
+      ha-card.no-battery #arc-grid-battery,
+      ha-card.no-battery #dot-pv-battery,
+      ha-card.no-battery #dot-grid-battery,
+      ha-card.no-battery #dot-battery-home,
+      ha-card.no-battery #dot-battery-grid,
+      ha-card.no-battery .battery-section,
+      ha-card.no-battery .battery-label {
+        display: none;
+      }
+
       :host(.no-pv) .canvas,
       ha-card.no-pv .canvas {
         margin-top: -44px;
@@ -322,6 +343,56 @@ class CompactPowerCard extends (window.LitElement ||
       .slice(0, 2);
   }
 
+  _normalizeSources(list) {
+    return (Array.isArray(list) ? list : [])
+      .map((raw) => {
+        if (typeof raw === "string") return { entity: raw };
+        if (typeof raw === "object" && raw) {
+          const explicit =
+            raw.entity || raw.entity_id || raw.id || raw.name || raw.source || raw.src;
+          if (explicit) return { ...raw, entity: explicit };
+          const keys = Object.keys(raw || {}).filter(
+            (k) => !["threshold", "color", "icon"].includes(k)
+          );
+          if (keys.length === 1) return { ...raw, entity: keys[0] };
+          return null;
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+  }
+
+  _coerceBoolean(val, defaultVal = false) {
+    if (val === undefined || val === null) return defaultVal;
+    if (typeof val === "string") {
+      const lower = val.toLowerCase().trim();
+      if (["false", "off", "0", "no"].includes(lower)) return false;
+      if (["true", "on", "1", "yes"].includes(lower)) return true;
+    }
+    return Boolean(val);
+  }
+
+  _getSourcesConfig() {
+    const raw = this._config?.entities?.sources;
+    let subtractFromHome = true;
+    let list = [];
+
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (raw && typeof raw === "object") {
+      if (Object.prototype.hasOwnProperty.call(raw, "subtract_from_home")) {
+        subtractFromHome = this._coerceBoolean(raw.subtract_from_home, true);
+      }
+      if (Array.isArray(raw.list)) list = raw.list;
+      else if (Array.isArray(raw.items)) list = raw.items;
+      else if (Array.isArray(raw.entities)) list = raw.entities;
+      else if (Array.isArray(raw.sources)) list = raw.sources;
+    }
+
+    return { sources: this._normalizeSources(list), subtractFromHome };
+  }
+
   _getColor(kind, entityCfg) {
     const cfg = this._config || {};
     const colors = cfg.colors || {};
@@ -348,12 +419,19 @@ class CompactPowerCard extends (window.LitElement ||
     return document?.body?.classList?.contains("theme-light") || false;
   }
 
-  _formatEntity(entityId, decimals = 1) {
+  _formatEntity(entityId, decimals = 1, attribute = null, unitOverride = null) {
     if (!this.hass || !entityId) return "";
     const obj = this.hass.states[entityId];
     if (!obj) return "";
-    const s = obj.state;
+    const s = attribute ? obj.attributes?.[attribute] : obj.state;
     const u = obj.attributes.unit_of_measurement;
+    if (unitOverride) {
+      const num = parseFloat(s);
+      if (Number.isFinite(num)) {
+        return `${num.toFixed(decimals)} ${unitOverride}`;
+      }
+      return `${s} ${unitOverride}`;
+    }
     if (s === "unknown" || s === "unavailable") return s;
     const num = parseFloat(s);
     const uLower = typeof u === "string" ? u.toLowerCase() : "";
@@ -374,12 +452,16 @@ class CompactPowerCard extends (window.LitElement ||
     return unit && unit.toLowerCase() === "w" && Number.isFinite(num) && Math.abs(num) >= 1000;
   }
 
-  _formatPower(num, unit, decimals = 1) {
+  _formatPower(num, unit, decimals = 1, unitOverride = null) {
+    const displayUnit = unitOverride || unit;
+    if (unitOverride) {
+      return `${num.toFixed(decimals)} ${displayUnit}`;
+    }
     if (this._isWattToKw(num, unit)) {
       const kw = num / 1000;
       return `${kw.toFixed(decimals)} kW`;
     }
-    if (unit) return `${num.toFixed(decimals)} ${unit}`;
+    if (displayUnit) return `${num.toFixed(decimals)} ${displayUnit}`;
     return String(num);
   }
 
@@ -420,6 +502,10 @@ class CompactPowerCard extends (window.LitElement ||
     return parsed == null ? 1 : parsed;
   }
 
+  _getUnitOverride(cfg) {
+    return cfg?.unit || cfg?.unit_of_measurement || null;
+  }
+
   _opacityFor(value, threshold) {
     if (!Number.isFinite(value)) return 1;
     if (value === 0) return 0.25;
@@ -427,11 +513,12 @@ class CompactPowerCard extends (window.LitElement ||
     return Math.abs(value) < threshold ? 0.25 : 1;
   }
 
-  _getNumeric(entityId) {
+  _getNumeric(entityId, attribute = null) {
     if (!this.hass || !entityId) return 0;
     const st = this.hass.states[entityId];
     if (!st) return 0;
-    const v = parseFloat(st.state);
+    const raw = attribute ? st.attributes?.[attribute] : st.state;
+    const v = parseFloat(raw);
     return Number.isNaN(v) ? 0 : v;
   }
 
@@ -450,6 +537,12 @@ class CompactPowerCard extends (window.LitElement ||
     const gridCfg = this._getEntityConfig("grid");
     const homeCfg = this._getEntityConfig("home");
     const batteryCfg = this._getEntityConfig("battery");
+    const hasBattery =
+      this._config?.entities &&
+      Object.prototype.hasOwnProperty.call(this._config.entities, "battery") &&
+      Boolean(batteryCfg?.entity);
+    const thresholdMode = String(this._config?.threshold_mode || "calculations").toLowerCase();
+    const useThresholdForCalc = thresholdMode === "calculations";
     const invertGrid = Boolean(gridCfg?.invert_state_values);
     const invertBattery = Boolean(batteryCfg?.invert_state_values);
     const pvLabels = this._normalizeLabels(pvCfg?.labels);
@@ -465,49 +558,50 @@ class CompactPowerCard extends (window.LitElement ||
     const gridThreshold = this._parseThreshold(gridCfg.threshold);
     const batteryThreshold = this._parseThreshold(batteryCfg.threshold);
 
-    const pv = Math.max(applyThreshold(this._getNumeric(pvCfg.entity), pvThreshold), 0);
+    const pvRaw = this._getNumeric(pvCfg.entity);
+    const pvCalc = useThresholdForCalc ? applyThreshold(pvRaw, pvThreshold) : pvRaw;
+    const pv = Math.max(pvCalc, 0);
+
     const gridRaw = this._getNumeric(gridCfg.entity);
     const batteryRaw = this._getNumeric(batteryCfg.entity);
-    const grid = applyThreshold(invertGrid ? -gridRaw : gridRaw, gridThreshold);
-    const homeRaw = this._getNumeric(homeCfg.entity);
-    const battery = applyThreshold(invertBattery ? -batteryRaw : batteryRaw, batteryThreshold);
+    const gridBase = invertGrid ? -gridRaw : gridRaw;
+    const batteryBase = invertBattery ? -batteryRaw : batteryRaw;
 
-    const sourcesCfgRaw = this._config?.entities?.sources;
-    const sourcesCfg = Array.isArray(sourcesCfgRaw) ? sourcesCfgRaw : [];
-    const normalizedSources = sourcesCfg
-      .map((raw) => {
-        if (typeof raw === "string") return { entity: raw };
-        if (typeof raw === "object" && raw) {
-          const explicit =
-            raw.entity || raw.entity_id || raw.id || raw.name || raw.source || raw.src;
-          if (explicit) return { ...raw, entity: explicit };
-          const keys = Object.keys(raw || {}).filter(
-            (k) => !["threshold", "color", "icon"].includes(k)
-          );
-          if (keys.length === 1) return { ...raw, entity: keys[0] };
-          return null;
-        }
-        return null;
-      })
-      .filter(Boolean)
-      .slice(0, 8);
+    const grid = useThresholdForCalc ? applyThreshold(gridBase, gridThreshold) : gridBase;
+    const homeRaw = this._getNumeric(homeCfg.entity);
+    const battery = useThresholdForCalc
+      ? applyThreshold(batteryBase, batteryThreshold)
+      : batteryBase;
+
+    // Flows always respect thresholds for visibility/animation
+    const pvFlow = Math.max(applyThreshold(pvRaw, pvThreshold), 0);
+    const gridFlow = applyThreshold(gridBase, gridThreshold);
+    const batteryFlow = applyThreshold(batteryBase, batteryThreshold);
+
+    const { sources: normalizedSources, subtractFromHome } = this._getSourcesConfig();
 
     let auxUsage = 0;
     for (const src of normalizedSources) {
       const entity = src.entity || null;
-      const val = this._getNumeric(entity);
+      const val = this._getNumeric(entity, src.attribute || null);
       if (!Number.isFinite(val)) continue;
       const thr = this._parseThreshold(src.threshold);
-      const effThr = thr == null ? 0 : thr;
-      if (Math.abs(val) > effThr && val > 0) auxUsage += val;
+      const valForCalc = useThresholdForCalc ? applyThreshold(val, thr) : val;
+      if (valForCalc > 0) auxUsage += valForCalc;
     }
 
-    const homeReported = Math.max(homeRaw - auxUsage, 0);
-    let homeBalanced = pv + battery - grid - auxUsage;
-    if (!Number.isFinite(homeBalanced)) homeBalanced = 0;
-    homeBalanced = Math.max(homeBalanced, 0);
-
-    const homeEffective = homeBalanced > homeReported ? homeBalanced : homeReported;
+    const hasHomeEntity = Boolean(homeCfg?.entity);
+    let homeEffective = 0;
+    const baseHome = Number.isFinite(homeRaw) ? homeRaw : 0;
+    if (hasHomeEntity) {
+      const adjustedHome = subtractFromHome ? baseHome - auxUsage : baseHome;
+      homeEffective = Math.max(adjustedHome, 0);
+    } else {
+      const homeReported = Math.max(subtractFromHome ? baseHome - auxUsage : baseHome, 0);
+      const inferredBase = pv + battery - grid;
+      const inferred = Math.max(subtractFromHome ? inferredBase - auxUsage : inferredBase, 0);
+      homeEffective = Math.max(inferred, homeReported);
+    }
     this._homeEffective = homeEffective;
 
     const pvColor = this._getColor("pv", pvCfg);
@@ -610,11 +704,11 @@ class CompactPowerCard extends (window.LitElement ||
     let pvToBattery = 0;
     let pvToGrid = 0;
 
-    if (pv > threshold) {
-      const gridExport = grid > 0 ? grid : 0;
-      const batteryCharge = battery < 0 ? -battery : 0;
+    if (pvFlow > threshold) {
+      const gridExport = gridFlow > 0 ? gridFlow : 0;
+      const batteryCharge = batteryFlow < 0 ? -batteryFlow : 0;
 
-      let remaining = pv;
+      let remaining = pvFlow;
 
       pvToHome = Math.min(remaining, homeEffective);
       remaining -= pvToHome;
@@ -634,9 +728,9 @@ class CompactPowerCard extends (window.LitElement ||
     }
 
     // Grid import (negative) – allocate only what PV/battery discharge didn't cover
-    const gridImport = grid < 0 ? -grid : 0;
-    const battDischarge = battery > 0 ? battery : 0;
-    const batteryCharge = battery < 0 ? -battery : 0;
+    const gridImport = gridFlow < 0 ? -gridFlow : 0;
+    const battDischarge = batteryFlow > 0 ? batteryFlow : 0;
+    const batteryCharge = batteryFlow < 0 ? -batteryFlow : 0;
 
     const batteryToHome = Math.min(battDischarge, Math.max(homeEffective - pvToHome, 0));
     const battDischargeAfterHome = Math.max(battDischarge - batteryToHome, 0);
@@ -673,7 +767,7 @@ class CompactPowerCard extends (window.LitElement ||
       };
 
     // Battery discharge
-    const gridExport = grid > 0 ? grid : 0;
+    const gridExport = gridFlow > 0 ? gridFlow : 0;
 
     if (batteryToHome > threshold)
       active["battery-home"] = {
@@ -833,31 +927,43 @@ class CompactPowerCard extends (window.LitElement ||
     const gridCfg = this._getEntityConfig("grid");
     const homeCfg = this._getEntityConfig("home");
     const batteryCfg = this._getEntityConfig("battery");
+    const hasBattery =
+      this._config?.entities &&
+      Object.prototype.hasOwnProperty.call(this._config.entities, "battery") &&
+      Boolean(batteryCfg?.entity);
     const invertGrid = Boolean(gridCfg?.invert_state_values);
     const invertBattery = Boolean(batteryCfg?.invert_state_values);
     const pvLabels = this._normalizeLabels(pvCfg?.labels);
     const gridLabels = this._normalizeLabels(gridCfg?.labels);
     const batteryLabels = this._normalizeLabels(batteryCfg?.labels);
-    const sourcesCfgRaw = this._config?.entities?.sources;
-    const sourcesCfg = Array.isArray(sourcesCfgRaw) ? sourcesCfgRaw : [];
+    const { sources: normalizedSources } = this._getSourcesConfig();
 
     const pvDecimals = this._getDecimalPlaces(pvCfg);
     const gridDecimals = this._getDecimalPlaces(gridCfg);
     const batteryDecimals = this._getDecimalPlaces(batteryCfg);
     const homeDecimals = this._getDecimalPlaces(homeCfg);
 
-    const pvVal = this._formatEntity(pvCfg.entity, pvDecimals);
-    const gridRawVal = this._formatEntity(gridCfg.entity, gridDecimals);
-    const battRawVal = this._formatEntity(batteryCfg.entity, batteryDecimals);
+    const pvUnitOverride = this._getUnitOverride(pvCfg);
+    const gridUnitOverride = this._getUnitOverride(gridCfg);
+    const batteryUnitOverride = this._getUnitOverride(batteryCfg);
+    const homeUnitOverride = this._getUnitOverride(homeCfg);
+
+    const pvVal = this._formatEntity(pvCfg.entity, pvDecimals, null, pvUnitOverride);
+    const gridRawVal = this._formatEntity(gridCfg.entity, gridDecimals, null, gridUnitOverride);
+    const battRawVal = this._formatEntity(batteryCfg.entity, batteryDecimals, null, batteryUnitOverride);
 
     const gridNumericRaw = this._getNumeric(gridCfg.entity);
     const gridNumeric = invertGrid ? -gridNumericRaw : gridNumericRaw;
     const gridUnit =
-      this.hass?.states?.[gridCfg.entity]?.attributes?.unit_of_measurement || "";
+      gridUnitOverride ||
+      this.hass?.states?.[gridCfg.entity]?.attributes?.unit_of_measurement ||
+      "";
     const battNumericRaw = this._getNumeric(batteryCfg.entity);
     const battNumeric = invertBattery ? -battNumericRaw : battNumericRaw;
     const battUnit =
-      this.hass?.states?.[batteryCfg.entity]?.attributes?.unit_of_measurement || "";
+      batteryUnitOverride ||
+      this.hass?.states?.[batteryCfg.entity]?.attributes?.unit_of_measurement ||
+      "";
     const battSocEntity = null;
     const battSocLabel = null;
     const pvNumeric = this._getNumeric(pvCfg.entity);
@@ -881,7 +987,7 @@ class CompactPowerCard extends (window.LitElement ||
       Number.isFinite(gridNumeric)
     ) {
       const mag = Math.abs(gridNumeric);
-      gridVal = this._formatPower(mag, gridUnit, gridDecimals);
+      gridVal = this._formatPower(mag, gridUnit, gridDecimals, gridUnitOverride);
       gridArrow =
         gridNumeric > 0 ? "mdi:arrow-left-bold" : gridNumeric < 0 ? "mdi:arrow-right-bold" : null;
     }
@@ -895,23 +1001,26 @@ class CompactPowerCard extends (window.LitElement ||
       Number.isFinite(battNumeric)
     ) {
       const mag = Math.abs(battNumeric);
-      battVal = this._formatPower(mag, battUnit, batteryDecimals);
+      battVal = this._formatPower(mag, battUnit, batteryDecimals, batteryUnitOverride);
       battArrow =
         battNumeric > 0 ? "mdi:arrow-left-bold" : battNumeric < 0 ? "mdi:arrow-right-bold" : null;
     }
 
     const homeUnit =
-      this.hass?.states?.[homeCfg.entity]?.attributes?.unit_of_measurement || "W";
+      homeUnitOverride ||
+      this.hass?.states?.[homeCfg.entity]?.attributes?.unit_of_measurement ||
+      "W";
     const forceRawHome =
       homeCfg.force_raw_state ||
       homeCfg.force_raw ||
       homeCfg.raw_state ||
       this._config?.home_force_raw;
-    let homeVal = this._formatEntity(homeCfg.entity);
+    const homeEffectiveRender = this._homeEffective || 0;
+    let homeVal = this._formatEntity(homeCfg.entity, homeDecimals, null, homeUnitOverride);
     if (!forceRawHome && this._homeEffective != null) {
       const effective = this._homeEffective;
       if (this._isWattToKw(effective, homeUnit)) {
-        homeVal = this._formatPower(effective, homeUnit, homeDecimals);
+        homeVal = this._formatPower(effective, homeUnit, homeDecimals, homeUnitOverride);
       } else {
         homeVal = `${effective.toFixed(homeDecimals)} ${homeUnit}`;
       }
@@ -924,7 +1033,8 @@ class CompactPowerCard extends (window.LitElement ||
 
     const pvOpacity = this._opacityFor(pvNumeric, this._parseThreshold(pvCfg.threshold));
     const gridOpacity = this._opacityFor(gridNumeric, this._parseThreshold(gridCfg.threshold));
-    const homeOpacity = this._opacityFor(homeNumeric, this._parseThreshold(homeCfg.threshold));
+    const homeValueForOpacity = homeCfg?.entity ? homeNumeric : homeEffectiveRender;
+    const homeOpacity = this._opacityFor(homeValueForOpacity, this._parseThreshold(homeCfg.threshold));
     const batteryOpacity = this._opacityFor(battNumeric, this._parseThreshold(batteryCfg.threshold));
     const batteryLabelOpacity =
       battNumeric === 0 && battRawVal && battRawVal !== "unknown" && battRawVal !== "unavailable"
@@ -935,24 +1045,6 @@ class CompactPowerCard extends (window.LitElement ||
     const batteryIcon = "mdi:battery";
 
     const batteryIconOpacity = battNumeric === 0 ? 1 : batteryOpacity;
-    const normalizedSources = sourcesCfg
-      .map((raw) => {
-        if (typeof raw === "string") return { entity: raw };
-        if (typeof raw === "object" && raw) {
-          const explicit =
-            raw.entity || raw.entity_id || raw.id || raw.name || raw.source || raw.src;
-          if (explicit) return { ...raw, entity: explicit };
-          const keys = Object.keys(raw || {}).filter(
-            (k) => !["threshold", "color", "icon"].includes(k)
-          );
-          if (keys.length === 1) return { ...raw, entity: keys[0] };
-          return null;
-        }
-        return null;
-      })
-      .filter(Boolean)
-      .slice(0, 8);
-
     const sourcePositions = [];
     const homeX = 300;
     const homeRowY = 190; // align with home marker vertically (aux row)
@@ -967,13 +1059,20 @@ class CompactPowerCard extends (window.LitElement ||
 
     const sources = normalizedSources.map((src, idx) => {
       const entity = src.entity || null;
+      const attribute = src.attribute || null;
       const icon = src.icon || this._getEntityIcon(entity, "mdi:power-plug");
-      const numeric = this._getNumeric(entity);
-      const unit = this.hass?.states?.[entity]?.attributes?.unit_of_measurement || "";
+      const numeric = this._getNumeric(entity, attribute);
+      const unit =
+        this._getUnitOverride(src) ||
+        this.hass?.states?.[entity]?.attributes?.unit_of_measurement ||
+        "";
       const decimals = this._getDecimalPlaces(src);
-      let val = this._formatEntity(entity, decimals);
+      let val = this._formatEntity(entity, decimals, attribute, this._getUnitOverride(src));
       if (Number.isFinite(numeric)) {
-        if (this._isWattToKw(numeric, unit)) {
+        const unitOverride = this._getUnitOverride(src);
+        if (unitOverride) {
+          val = `${Number(numeric).toFixed(decimals)} ${unitOverride}`;
+        } else if (this._isWattToKw(numeric, unit)) {
           val = `${(numeric / 1000).toFixed(decimals)} kW`;
         } else if (unit) {
           val = `${Number(numeric).toFixed(decimals)} ${unit}`;
@@ -990,6 +1089,10 @@ class CompactPowerCard extends (window.LitElement ||
       return { entity, icon, val, color, pos, opacity, leftPct, topPct, numeric };
     });
 
+    // Sync host classes for hiding sections
+    this.classList.toggle("no-pv", !hasPv);
+    this.classList.toggle("no-battery", !hasBattery);
+
     const pvLabelPositions = [
       { x: 260, anchor: "anchor-right" },
       { x: 340, anchor: "anchor-left" },
@@ -997,13 +1100,15 @@ class CompactPowerCard extends (window.LitElement ||
     const pvLabelY = 36;
     const pvLabelItems = pvLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
+      const attribute = lbl.attribute || null;
+      const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getEntityIcon(entity, "mdi:tag-text-outline");
       const color = lbl.color || pvColor;
-      const numeric = this._getNumeric(entity);
+      const numeric = this._getNumeric(entity, attribute);
       const decimals = this._getDecimalPlaces(lbl);
-      const val = this._formatEntity(entity, decimals);
+      const val = this._formatEntity(entity, decimals, attribute, unitOverride);
       const threshold = this._parseThreshold(lbl.threshold);
-      const opacity = this._opacityFor(numeric, threshold);
+      const opacity = numeric === 0 ? 1 : this._opacityFor(numeric, threshold);
       const posMeta = pvLabelPositions[idx] || pvLabelPositions[pvLabelPositions.length - 1];
       const leftPct = (posMeta.x / 600) * 100;
       const topPct = (pvLabelY / 240) * 100;
@@ -1026,13 +1131,15 @@ class CompactPowerCard extends (window.LitElement ||
     ];
     const gridLabelItems = gridLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
+      const attribute = lbl.attribute || null;
+      const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getEntityIcon(entity, "mdi:tag-text-outline");
       const color = lbl.color || gridColor;
-      const numeric = this._getNumeric(entity);
+      const numeric = this._getNumeric(entity, attribute);
       const decimals = this._getDecimalPlaces(lbl);
-      const val = this._formatEntity(entity, decimals);
+      const val = this._formatEntity(entity, decimals, attribute, unitOverride);
       const threshold = this._parseThreshold(lbl.threshold);
-      const opacity = this._opacityFor(numeric, threshold);
+      const opacity = numeric === 0 ? 1 : this._opacityFor(numeric, threshold);
       const pos = gridLabelPositions[idx] || gridLabelPositions[gridLabelPositions.length - 1];
       return {
         entity,
@@ -1052,11 +1159,13 @@ class CompactPowerCard extends (window.LitElement ||
     ];
     const batteryLabelItems = batteryLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
+      const attribute = lbl.attribute || null;
+      const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getEntityIcon(entity, "mdi:tag-text-outline");
       const color = lbl.color || batteryColor;
-      const numeric = this._getNumeric(entity);
+      const numeric = this._getNumeric(entity, attribute);
       const decimals = this._getDecimalPlaces(lbl);
-      const val = this._formatEntity(entity, decimals);
+      const val = this._formatEntity(entity, decimals, attribute, unitOverride);
       const threshold = this._parseThreshold(lbl.threshold);
       const opacity = this._opacityFor(numeric, threshold);
       const pos = batteryLabelPositions[idx] || batteryLabelPositions[batteryLabelPositions.length - 1];
@@ -1074,7 +1183,12 @@ class CompactPowerCard extends (window.LitElement ||
 
 
     return html`
-      <ha-card class="${hasPv ? "" : "no-pv"}">
+      <ha-card class="${[
+        hasPv ? "" : "no-pv",
+        hasBattery ? "" : "no-battery",
+      ]
+        .filter(Boolean)
+        .join(" ")}">
         <div class="canvas">
           <svg viewBox="0 0 600 240" preserveAspectRatio="xMidYMid meet">
 
@@ -1122,14 +1236,16 @@ class CompactPowerCard extends (window.LitElement ||
                 </div>
               </div>`
             )}
-            ${batteryLabelItems.map(
-              (lbl) => html`<div class="overlay-item anchor-right" style="left:${lbl.xPct}%; top:${lbl.yPct}%;">
-                <div class="aux-marker clickable" style="flex-direction: row; gap: 4px;" @click=${() => this._openMoreInfo(lbl.entity || null)}>
-                  <div class="aux-label" style="color:${lbl.color}; opacity:${lbl.opacity};">${renderValue(lbl.val)}</div>
-                  <ha-icon icon="${lbl.icon}" style="color:${lbl.color}; opacity:${lbl.opacity}; --mdc-icon-size: 16px; filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
-                </div>
-              </div>`
-            )}
+            ${hasBattery
+              ? batteryLabelItems.map(
+                  (lbl) => html`<div class="overlay-item anchor-right battery-label" style="left:${lbl.xPct}%; top:${lbl.yPct}%;">
+                    <div class="aux-marker clickable" style="flex-direction: row; gap: 4px;" @click=${() => this._openMoreInfo(lbl.entity || null)}>
+                      <div class="aux-label" style="color:${lbl.color}; opacity:${lbl.opacity};">${renderValue(lbl.val)}</div>
+                      <ha-icon icon="${lbl.icon}" style="color:${lbl.color}; opacity:${lbl.opacity}; --mdc-icon-size: 16px; filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
+                    </div>
+                  </div>`
+                )
+              : ""}
             <div class="overlay-item pv-section" style="left:${(300/600)*100}%; top:${(36/240)*100}%;">
               <div class="node-marker pv-marker clickable" @click=${() => this._openMoreInfo(pvCfg.entity)}>
                 <div class="node-label" style="color:${pvColor}; opacity:${pvOpacity};">${renderValue(pvVal)}</div>
@@ -1156,17 +1272,19 @@ class CompactPowerCard extends (window.LitElement ||
                 <div class="home-label" style="color:${homeColor}; opacity:${homeOpacity};">${renderValue(homeVal)}</div>
               </div>
             </div>
-            <div class="overlay-item anchor-right" style="left:${(572/600)*100}%; top:${(108/240)*100}%;">
-              <div class="node-marker battery-marker right clickable" @click=${() => this._openMoreInfo(batteryCfg.entity)}>
-                <ha-icon icon="${batteryIcon}" style="color:${batteryColor}; opacity:${batteryIconOpacity}; filter:${!this._isLightTheme() && battNumeric !== 0 ? `drop-shadow(0 0 10px ${batteryColor})` : "none"};"></ha-icon>
-                <div class="node-label right" style="color:${batteryColor}; opacity:${batteryLabelOpacity};">
-                  ${battArrow
-                    ? html`<ha-icon class="inline-icon" icon="${battArrow}" style="color:${batteryColor}; opacity:1;"></ha-icon>`
-                    : ""}
-                  <span style="opacity:1;">${renderValue(battVal)}</span>
-                </div>
-              </div>
-            </div>
+            ${hasBattery
+              ? html`<div class="overlay-item anchor-right battery-section" style="left:${(572/600)*100}%; top:${(108/240)*100}%;">
+                  <div class="node-marker battery-marker right clickable" @click=${() => this._openMoreInfo(batteryCfg.entity)}>
+                    <ha-icon icon="${batteryIcon}" style="color:${batteryColor}; opacity:${batteryIconOpacity}; filter:${!this._isLightTheme() && battNumeric !== 0 ? `drop-shadow(0 0 10px ${batteryColor})` : "none"};"></ha-icon>
+                    <div class="node-label right" style="color:${batteryColor}; opacity:${batteryLabelOpacity};">
+                      ${battArrow
+                        ? html`<ha-icon class="inline-icon" icon="${battArrow}" style="color:${batteryColor}; opacity:1;"></ha-icon>`
+                        : ""}
+                      <span style="opacity:1;">${renderValue(battVal)}</span>
+                    </div>
+                  </div>
+                </div>`
+              : ""}
 
             ${sources.map(
               (src) => html`<div class="overlay-item" style="left:${src.leftPct}%; top:${src.topPct}%;">

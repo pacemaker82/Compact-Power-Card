@@ -71,6 +71,11 @@ entities:
       - entity: sensor.pool_pump_power
         icon: mdi:pool
         threshold: 50
+      - entity: climate.garage
+        attribute: temperature
+        unit: "C"
+        icon: mdi:pool
+        threshold: 50
 ```
 
 # Compact Power Card Settings (Quick Reference)

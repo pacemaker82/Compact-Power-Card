@@ -45,7 +45,7 @@ entities:
         color: "#ffb300"             
   grid:
     entity: sensor.grid_power
-    invert_state_values: true  
+    invert_state_values: false
     threshold: 25
     labels:
       - entity: sensor.grid_voltage
@@ -56,7 +56,7 @@ entities:
     decimal_places: 1
   battery:
     entity: sensor.battery_power
-    invert_state_values: true  
+    invert_state_values: false
     threshold: 25
     labels:
       - entity: sensor.battery_soc

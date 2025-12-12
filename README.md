@@ -32,43 +32,37 @@ Inspired by the excellent [power flow card plus](https://github.com/flixlix/powe
 ## Card Configuration:
 ```yaml
 type: custom:compact-power-card
-threshold_mode: calculations        # zeroes sub-threshold values in math and display
-
+threshold_mode: calculations
 entities:
   pv:
     entity: sensor.solar_power
     color: var(--energy-solar-color)
-    threshold: 50                   # W
+    threshold: 50                   
     decimal_places: 1
-    labels:                         # optional (max 2)
+    labels:                         
       - entity: sensor.solar_energy_today
         unit: kWh
-        color: "#ffb300"             # custom label color example
-
+        color: "#ffb300"             
   grid:
     entity: sensor.grid_power
-    invert_state_values: true       # grid import negative → positive for display
+    invert_state_values: true  
     threshold: 25
     labels:
       - entity: sensor.grid_voltage
-        icon: mdi:lightning-bolt     # custom label icon example
+        icon: mdi:lightning-bolt 
         unit: V
-
   home:
     entity: sensor.home_power
     decimal_places: 1
-
   battery:
     entity: sensor.battery_power
-    invert_state_values: true       # discharge positive
+    invert_state_values: true  
     threshold: 25
     labels:
       - entity: sensor.battery_soc
         unit: "%"
-
-  # Optional auxiliary loads (e.g., EV, pool, heat pump)
   sources:
-    subtract_from_home: true        # default; set false to leave home untouched
+    subtract_from_home: true 
     list:
       - entity: sensor.ev_charger_power
         icon: mdi:car-electric

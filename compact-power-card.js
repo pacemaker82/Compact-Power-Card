@@ -8,6 +8,43 @@ class CompactPowerCard extends (window.LitElement ||
     };
   }
 
+  get html() {
+    return (window.LitElement ||
+      Object.getPrototypeOf(customElements.get("ha-panel-lovelace"))).prototype.html;
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: "help_text",
+          type: "constant",
+          value: "",
+        },
+      ],
+      computeLabel: (schema) => {
+        if (schema.name === "help_text") return "Settings Coming Soon";                
+        return undefined;
+      },
+      computeHelper: (schema) => {
+        switch (schema.name) {
+          case "help_text":
+            return "some helpful text";          
+        }
+        return undefined;
+      },
+    };
+  }    
+
+  getGridOptions() {
+    return {
+      rows: 3,
+      columns: 12,
+      min_rows: 3,
+      min_columns: 9,
+    };
+  }
+
   static getStubConfig() {
     return {
       type: "custom:compact-power-card",
@@ -54,22 +91,28 @@ class CompactPowerCard extends (window.LitElement ||
   }
 
   static get styles() {
-    return this.css`
+    const css =
+      (window.LitElement ||
+        Object.getPrototypeOf(customElements.get("ha-panel-lovelace"))).prototype.css;
+    return css`
       :host {
         --cpc-scale: 1;
+        display: block;
+        height: 100%;
       }
 
       ha-card {
         box-sizing: border-box;
         padding: 0 4px 2px;
-        background: transparent;
-        box-shadow: none;
+        background: var(--ha-card-background, var(--card-background-color));
+        box-shadow: var(--ha-card-box-shadow);
         position: relative;
+        height: 100%;
       }
 
       svg {
         width: 100%;
-        height: auto;
+        height: 100%;
         display: block;
       }
 
@@ -83,6 +126,7 @@ class CompactPowerCard extends (window.LitElement ||
         stroke: #7a7a7a;
         stroke-opacity: 0.15;
         transition: stroke 0.3s ease, stroke-opacity 0.3s ease;
+        vector-effect: non-scaling-stroke;
       }
 
       .pv-header {
@@ -133,7 +177,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .node-marker ha-icon {
-        --mdc-icon-size: calc(26px * var(--cpc-scale, 1));
+        --mdc-icon-size: calc(28px * var(--cpc-scale, 1));
         filter: drop-shadow(0 0 0 rgba(0,0,0,0));
       }
 
@@ -239,6 +283,7 @@ class CompactPowerCard extends (window.LitElement ||
       .canvas {
         position: relative;
         width: 100%;
+        height: 100%;
       }
 
       .overlay {
@@ -335,17 +380,15 @@ class CompactPowerCard extends (window.LitElement ||
   }
 
   _updateScale() {
-    const hostWidth = this.getBoundingClientRect ? this.getBoundingClientRect().width : null;
+    const rect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
+    const hostWidth = rect?.width || 0;
     if (!hostWidth || hostWidth < 200) {
       this.style.setProperty("--cpc-scale", "1");
       return;
     }
-    const baseWidth = 500; // keep full size for typical widths; only shrink below this
-    const linearScale = hostWidth / baseWidth;
-    const scale =
-      hostWidth >= baseWidth
-        ? 1
-        : Math.max(0.8, Math.min(1, linearScale));
+    const baseWidth = 512; // match viewBox width
+    const widthScale = hostWidth / baseWidth;
+    const scale = Math.max(0.7, Math.min(1, widthScale));
     this.style.setProperty("--cpc-scale", scale.toFixed(3));
   }
 
@@ -490,15 +533,11 @@ class CompactPowerCard extends (window.LitElement ||
   }
 
   _getHeightFactor() {
-    const raw = Number(this._config?.height_factor ?? 1);
-    if (!Number.isFinite(raw) || raw <= 0) return 1;
-    return raw;
+    return 1;
   }
 
   _getEffectiveHeightFactor(batteryCount = 1) {
-    const userFactor = this._getHeightFactor();
-    const minFactor = 1 + 0.26 * Math.max(0, batteryCount - 1);
-    return Math.max(userFactor, minFactor);
+    return 1;
   }
 
   _isLightTheme() {
@@ -719,12 +758,6 @@ class CompactPowerCard extends (window.LitElement ||
       this._config?.entities &&
       Object.prototype.hasOwnProperty.call(this._config.entities, "battery") &&
       batteryList.some((b) => Boolean(b?.entity));
-    const baseHeight = 240;
-    const heightFactor = this._getEffectiveHeightFactor(batteryList.length);
-    const homeShift = (heightFactor - 1) * baseHeight;
-    const gridBatteryShift = (heightFactor - 1) * baseHeight * 0.5; // keep grid/battery higher than home
-    const syHome = (v) => v + homeShift;
-    const syGridBatt = (v) => v + gridBatteryShift;
     const thresholdMode = String(this._config?.threshold_mode || "calculations").toLowerCase();
     const useThresholdForCalc = thresholdMode === "calculations";
     const invertGrid = Boolean(gridCfg?.invert_state_values);
@@ -880,21 +913,55 @@ class CompactPowerCard extends (window.LitElement ||
       this._setLineColor(id, baseColor, false);
     }
 
+    // Geometry helpers consistent with render()
+    const designWidth = 512;
+    const designHeight = 184;
+    const defaultWidth = 512;
+    const defaultHeight = 184;
+    const hostRect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
+    const baseWidth = Math.max(200, hostRect?.width || defaultWidth);
+    const baseHeight = Math.max(120, hostRect?.height || defaultHeight);
+    const extraHeight = Math.max(0, baseHeight - designHeight);
+    const anchorLeftX = 51.2;
+    const anchorRightMargin = 51.2;
+    const designUsableWidth = designWidth - anchorLeftX - anchorRightMargin;
+    const usableWidth = Math.max(10, baseWidth - anchorLeftX - anchorRightMargin);
+    const sx = (v) => anchorLeftX + ((v - anchorLeftX) / designUsableWidth) * usableWidth;
+    const sy = (v) => v; // keep base coords stable in Y; extra height applied below
+    const syHome = (v) => sy(v) + extraHeight;
+    const syGridBatt = (v) => sy(v) + extraHeight * 0.5;
+    const homeCenterX = baseWidth / 2;
+    const homeLineOffset = 17;
+    const gridHomeEndX = homeCenterX - homeLineOffset;
+    const homeBatteryStartX = homeCenterX + homeLineOffset;
+    const pvCenterX = homeCenterX;
+    const pvLeftBendX = pvCenterX - 16; // 240 at default
+    const pvLeftArcEndX = pvCenterX - 8.5; // 247.5 at default
+    const pvRightArcStartX = pvCenterX + 8.5; // 264.5 at default
+    const pvRightArcEndX = pvCenterX + 15; // 271 at default
+    const homeAnchorX = homeCenterX;
+    const homeAnchorY = syHome(135);
+    const batteryAnchorX = sx(488);
+    const batteryAnchorY = syGridBatt(86);
+    const gridAnchorX = sx(anchorLeftX);
+    const gridMidY = syGridBatt(81.3);
+    const gridArcY = syGridBatt(73.6);
+
     // Geometry updated for marker positions:
     // PV marker anchor around (300,75) – below icon/label
     // GRID marker anchor around (60,75) inset to allow label width near edge
     // HOME marker anchor around (300,150)
     // BATTERY marker anchor around (540,75) inset equally to allow label width
     const geom = {
-      "pv-grid": { mode: "line", x1: 290, y1: 70, x2: 60, y2: syGridBatt(86) },
-      "pv-home": { mode: "line", x1: 300, y1: 70, x2: 300, y2: syHome(140) },
-      "pv-battery": { mode: "line", x1: 310, y1: 70, x2: 540, y2: syGridBatt(86) },
+      "pv-grid": { mode: "line", x1: pvLeftArcEndX, y1: sy(52), x2: sx(51.2), y2: syGridBatt(65) },
+      "pv-home": { mode: "line", x1: homeCenterX, y1: sy(52), x2: homeCenterX, y2: syHome(106) },
+      "pv-battery": { mode: "line", x1: pvRightArcStartX, y1: sy(52), x2: sx(460.8), y2: syGridBatt(65) },
 
       "grid-home": { mode: "path", pathId: "line-grid-home" },
-      "battery-home": { mode: "line", x1: 540, y1: syGridBatt(106), x2: 320, y2: syHome(160) },
+      "battery-home": { mode: "line", x1: sx(460.8), y1: syGridBatt(81.3), x2: homeBatteryStartX, y2: syHome(122.7) },
 
-      "grid-battery": { mode: "line", x1: 60, y1: syGridBatt(96), x2: 540, y2: syGridBatt(96) },
-      "battery-grid": { mode: "line", x1: 540, y1: syGridBatt(96), x2: 60, y2: syGridBatt(96) },
+      "grid-battery": { mode: "line", x1: sx(51.2), y1: syGridBatt(73.6), x2: sx(460.8), y2: syGridBatt(73.6) },
+      "battery-grid": { mode: "line", x1: sx(460.8), y1: syGridBatt(73.6), x2: sx(51.2), y2: syGridBatt(73.6) },
     };
 
     // Let flow dots follow the current drawn geometry (lines/paths) when updated.
@@ -932,75 +999,58 @@ class CompactPowerCard extends (window.LitElement ||
 
     const active = {};
 
-    // PV → (home → battery → grid)
-    let pvToHome = 0;
-    let pvToBattery = 0;
-    let pvToGrid = 0;
-
-    if (pvFlow > threshold) {
-      const gridExport = gridFlow > 0 ? gridFlow : 0;
-      const batteryCharge = batteryFlow < 0 ? -batteryFlow : 0;
-
-      let remaining = pvFlow;
-
-      pvToHome = Math.min(remaining, homeEffective);
-      remaining -= pvToHome;
-
-      pvToBattery = Math.min(remaining, batteryCharge);
-      remaining -= pvToBattery;
-
-      pvToGrid = Math.min(remaining, gridExport);
-      remaining -= pvToGrid;
-
-      if (pvToHome > threshold)
-        active["pv-home"] = { geom: geom["pv-home"], magnitude: pvToHome, color: pvColor };
-      if (pvToBattery > threshold)
-        active["pv-battery"] = { geom: geom["pv-battery"], magnitude: pvToBattery, color: pvColor };
-      if (pvToGrid > threshold)
-        active["pv-grid"] = { geom: geom["pv-grid"], magnitude: pvToGrid, color: pvColor };
-    }
-
-    // Grid import (negative) – allocate only what PV/battery discharge didn't cover
+    // Flow priorities:
+    // Grid (import): home → battery (charge)
+    // PV: home → battery (charge) → export
+    // Battery (discharge): home → export (only what PV/grid didn't cover)
     const gridImport = gridFlow < 0 ? -gridFlow : 0;
+    const gridExport = gridFlow > 0 ? gridFlow : 0;
     const battDischarge = batteryFlow > 0 ? batteryFlow : 0;
-    const batteryCharge = batteryFlow < 0 ? -batteryFlow : 0;
+    const battCharge = batteryFlow < 0 ? -batteryFlow : 0;
 
-    const batteryToHome = Math.min(battDischarge, Math.max(homeEffective - pvToHome, 0));
+    let homeNeed = Math.max(homeEffective, 0);
+    let chargeNeed = battCharge;
+
+    // Grid import → home, then battery charge
+    const gridToHome = Math.min(gridImport, homeNeed);
+    homeNeed -= gridToHome;
+    const gridImportRemaining = Math.max(gridImport - gridToHome, 0);
+    const gridToBattery = Math.min(gridImportRemaining, chargeNeed);
+    chargeNeed -= gridToBattery;
+
+    // PV → remaining home, then remaining battery charge, then export
+    const pvToHome = Math.min(pvFlow, homeNeed);
+    homeNeed -= pvToHome;
+    let pvRemaining = pvFlow - pvToHome;
+    const pvToBattery = Math.min(pvRemaining, chargeNeed);
+    pvRemaining -= pvToBattery;
+    const pvToGrid = Math.min(pvRemaining, gridExport);
+
+    // Battery discharge → remaining home, then export (only what PV export didn't cover)
+    const batteryToHome = Math.min(battDischarge, homeNeed);
+    homeNeed -= batteryToHome;
     const battDischargeAfterHome = Math.max(battDischarge - batteryToHome, 0);
-    const remainingHomeNeed = Math.max(homeEffective - pvToHome - batteryToHome, 0);
-    let gridHomeMagnitude = Math.min(gridImport, remainingHomeNeed);
-    let gridImportAfterHome = Math.max(gridImport - gridHomeMagnitude, 0);
-    const remainingBatteryCharge = Math.max(batteryCharge - pvToBattery, 0);
-    let gridBatteryMagnitude = Math.min(gridImportAfterHome, remainingBatteryCharge);
+    const batteryToGrid = Math.min(battDischargeAfterHome, Math.max(gridExport - pvToGrid, 0));
 
-    // Fallback: if grid import exists but allocations are zero (rounding / mismatched sensors),
-    // send import somewhere sensible so flows still render.
-    if (gridImport > gridImportThreshold && gridHomeMagnitude === 0 && gridBatteryMagnitude === 0) {
-      if (remainingBatteryCharge > 0) {
-        gridBatteryMagnitude = Math.min(gridImport, remainingBatteryCharge || gridImport);
-        gridImportAfterHome = Math.max(gridImport - gridBatteryMagnitude, 0);
-      } else {
-        gridHomeMagnitude = gridImport;
-        gridImportAfterHome = 0;
-      }
-    }
+    if (pvToHome > threshold)
+      active["pv-home"] = { geom: geom["pv-home"], magnitude: pvToHome, color: pvColor };
+    if (pvToBattery > threshold)
+      active["pv-battery"] = { geom: geom["pv-battery"], magnitude: pvToBattery, color: pvColor };
+    if (pvToGrid > threshold)
+      active["pv-grid"] = { geom: geom["pv-grid"], magnitude: pvToGrid, color: pvColor };
 
-    if (gridHomeMagnitude > gridImportThreshold)
+    if (gridToHome > gridImportThreshold)
       active["grid-home"] = {
         geom: geom["grid-home"],
-        magnitude: gridHomeMagnitude,
+        magnitude: gridToHome,
         color: gridColor,
       };
-
-    if (gridBatteryMagnitude > gridImportThreshold)
+    if (gridToBattery > gridImportThreshold)
       active["grid-battery"] = {
         geom: geom["grid-battery"],
-        magnitude: gridBatteryMagnitude,
+        magnitude: gridToBattery,
         color: gridColor,
       };
-
-    // Battery discharge
-    const gridExport = gridFlow > 0 ? gridFlow : 0;
 
     if (batteryToHome > threshold)
       active["battery-home"] = {
@@ -1008,87 +1058,27 @@ class CompactPowerCard extends (window.LitElement ||
         magnitude: batteryToHome,
         color: batteryColor,
       };
-
-    let gridExportRemaining = Math.max(gridExport - pvToGrid, 0);
-
-    // If PV already covers all export, reserve room to show battery export first
-    if (
-      battDischargeAfterHome > threshold &&
-      gridExport > threshold &&
-      gridExportRemaining <= threshold
-    ) {
-      const batteryToGrid = Math.min(battDischargeAfterHome, gridExport);
-      const pvGridShare = Math.max(gridExport - batteryToGrid, 0);
-
-      if (pvGridShare > threshold) {
-        active["pv-grid"] = {
-          geom: geom["pv-grid"],
-          magnitude: pvGridShare,
-          color: pvColor,
-        };
-      } else {
-        delete active["pv-grid"];
-      }
-
-      gridExportRemaining = Math.max(gridExport - pvGridShare, 0);
-      const batteryExportMag = Math.min(batteryToGrid, gridExportRemaining);
-      if (batteryExportMag > threshold) {
-        active["battery-grid"] = {
-          geom: geom["battery-grid"],
-          magnitude: batteryExportMag,
-          color: batteryColor,
-        };
-      }
-    } else if (battDischargeAfterHome > threshold && gridExportRemaining > threshold) {
-      const batteryToGrid = Math.min(battDischargeAfterHome, gridExportRemaining);
+    if (batteryToGrid > threshold)
       active["battery-grid"] = {
         geom: geom["battery-grid"],
         magnitude: batteryToGrid,
         color: batteryColor,
       };
+
+    // Fallback: if battery is discharging but no line was activated (PV/grid covered needs),
+    // still show a battery → home flow so discharge is visible.
+    if (
+      battDischarge > threshold &&
+      !active["battery-home"] &&
+      !active["battery-grid"]
+    ) {
+      active["battery-home"] = {
+        geom: geom["battery-home"],
+        magnitude: battDischarge,
+        color: batteryColor,
+      };
     }
 
-    // When exporting to grid and battery is discharging, prefer battery → home first,
-    // then PV fills remaining home, and PV surplus exports. Suppress battery → grid.
-    if (gridExport > threshold && battDischarge > threshold) {
-      const batteryToHomeAdj = Math.min(battDischarge, Math.max(homeEffective, 0));
-      const remainingHomeNeedAdj = Math.max(homeEffective - batteryToHomeAdj, 0);
-      const pvToHomeAdj = Math.min(pvFlow, remainingHomeNeedAdj);
-      const pvSurplusAdj = Math.max(pvFlow - pvToHomeAdj, 0);
-      const pvToGridAdj = Math.min(pvSurplusAdj, gridExport);
-
-      if (batteryToHomeAdj > threshold) {
-        active["battery-home"] = {
-          geom: geom["battery-home"],
-          magnitude: batteryToHomeAdj,
-          color: batteryColor,
-        };
-      } else {
-        delete active["battery-home"];
-      }
-
-      if (pvToHomeAdj > threshold) {
-        active["pv-home"] = {
-          geom: geom["pv-home"],
-          magnitude: pvToHomeAdj,
-          color: pvColor,
-        };
-      } else {
-        delete active["pv-home"];
-      }
-
-      if (pvToGridAdj > threshold) {
-        active["pv-grid"] = {
-          geom: geom["pv-grid"],
-          magnitude: pvToGridAdj,
-          color: pvColor,
-        };
-      } else {
-        delete active["pv-grid"];
-      }
-
-      delete active["battery-grid"];
-    }
 
     let maxFlow = 0;
     for (const f of Object.values(active)) {
@@ -1250,18 +1240,49 @@ class CompactPowerCard extends (window.LitElement ||
       : batteryCfg?.labels;
     const batteryLabels = this._normalizeLabels(batteryLabelsSource);
     const { sources: normalizedSources } = this._getSourcesConfig();
-    const baseWidth = 600;
-    const baseHeight = 240;
-    const heightFactor = this._getEffectiveHeightFactor(batteryList.length);
-    const homeShift = (heightFactor - 1) * baseHeight;
-    const gridBatteryShift = (heightFactor - 1) * baseHeight * 0.5;
-    const syHome = (v) => v + homeShift;
-    const syGridBatt = (v) => v + gridBatteryShift;
-    const viewHeight = baseHeight * heightFactor;
-    const pctBaseY = (v) => (v / viewHeight) * 100; // PV: stay near top as view grows
-    const pctGridY = (v) => ((v + gridBatteryShift) / viewHeight) * 100;
-    const pctGridFixed = (v) => (v / baseHeight) * 100; // keep label anchors stable when height grows
-    const pctHomeY = (v) => ((v + homeShift) / viewHeight) * 100;
+    const designWidth = 512;
+    const designHeight = 184;
+    const defaultWidth = 512;
+    const defaultHeight = 184;
+    const hostRect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
+    const baseWidth = Math.max(200, hostRect?.width || defaultWidth);
+    const baseHeight = Math.max(120, hostRect?.height || defaultHeight);
+    const extraHeight = Math.max(0, baseHeight - designHeight);
+    const viewHeight = baseHeight;
+    const anchorLeftX = 51.2;
+    const anchorRightMargin = 51.2;
+    const designUsableWidth = designWidth - anchorLeftX - anchorRightMargin;
+    const usableWidth = Math.max(10, baseWidth - anchorLeftX - anchorRightMargin);
+    const sx = (v) => anchorLeftX + ((v - anchorLeftX) / designUsableWidth) * usableWidth;
+    const sy = (v) => v; // keep base coords stable in Y; we’ll add extra height only where needed
+    const syHome = (v) => sy(v) + extraHeight; // home row grows downward with height
+    const syGridBatt = (v) => sy(v) + extraHeight * 0.5; // mid rows grow halfway
+    const homeCenterX = baseWidth / 2;
+    const homeLineOffset = 17;
+    const gridHomeEndX = homeCenterX - homeLineOffset;
+    const homeBatteryStartX = homeCenterX + homeLineOffset;
+    const gridHomeH1X = gridHomeEndX - homeLineOffset; // 17px inset before curve
+    const homeBatteryCtrl2X = homeBatteryStartX + homeLineOffset; // second control 17px out
+    const pvCenterX = homeCenterX;
+    const pvLeftBendX = pvCenterX - 16; // 240 at default
+    const pvLeftArcEndX = pvCenterX - 8.5; // 247.5 at default
+    const pvRightArcStartX = pvCenterX + 8.5; // 264.5 at default
+    const pvRightArcEndX = pvCenterX + 15; // 271 at default
+    const gridLineStartX = sx(51.2);
+    const gridLineEndX = sx(460.8);
+    const gridArcMidX = (gridLineStartX + gridLineEndX) / 2;
+    const gridArcHalfWidth = 12.8; // half of 25.6px
+    const gridArcStartX = gridArcMidX - gridArcHalfWidth;
+    const gridArcEndX = gridArcMidX + gridArcHalfWidth;
+    const gridArcCtrlX = gridArcMidX;
+    const gridArcY = syGridBatt(73.6);
+    const gridArcCtrlY = gridArcY - 15.3; // hump rises 15.3px above midline
+    const gridIconX = gridLineStartX - 26; // offset from line start
+    const batteryIconX = gridLineEndX + 26; // offset from line end
+    const pctBaseY = (v) => ((sy(v)) / viewHeight) * 100; // PV: stay near top as view grows
+    const pctGridY = (v) => ((syGridBatt(v)) / viewHeight) * 100;
+    const pctGridFixed = (v) => (sy(v) / viewHeight) * 100; // keep label anchors stable when height grows
+    const pctHomeY = (v) => ((syHome(v)) / viewHeight) * 100;
 
     const pvDecimals = this._getDecimalPlaces(pvCfg);
     const gridDecimals = this._getDecimalPlaces(gridCfg);
@@ -1391,15 +1412,15 @@ class CompactPowerCard extends (window.LitElement ||
 
     const batteryIconOpacity = 1;
     const sourcePositions = [];
-    const homeX = 300;
-    const homeRowY = 190; // align with home marker vertically (aux row, base reference)
-    const leftSlots = [homeX - 70, homeX - 130, homeX - 190, homeX - 250];
-    const rightSlots = [homeX + 70, homeX + 130, homeX + 190, homeX + 250];
+    const homeX = homeCenterX;
+    const homeRowYBase = 145; // base Y for aux row; actual Y will be adjusted via pctHomeY
+    const leftSlots = [homeX - sx(60), homeX - sx(120), homeX - sx(180), homeX - sx(240)];
+    const rightSlots = [homeX + sx(60), homeX + sx(120), homeX + sx(180), homeX + sx(240)];
     for (let i = 0; i < normalizedSources.length && i < 8; i++) {
       const isLeft = i % 2 === 0;
       const idx = Math.floor(i / 2);
       const x = isLeft ? leftSlots[idx] : rightSlots[idx];
-      sourcePositions.push({ x, y: homeRowY });
+      sourcePositions.push({ x, y: homeRowYBase });
     }
 
     const sources = normalizedSources.map((src, idx) => {
@@ -1418,7 +1439,7 @@ class CompactPowerCard extends (window.LitElement ||
         ? this._formatPower(numericW, "W", decimals, unitOverride ?? null)
         : this._formatEntity(entity, decimals, attribute, unitOverride);
       const color = src.color || homeColor;
-      const pos = sourcePositions[idx] || { x: homeX, y: homeRowY };
+      const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
       const threshold = this._toWatts(this._parseThreshold(src.threshold), "W", true);
       const opacity = this._opacityFor(numericW, threshold);
       const hidden = this._isBelowThreshold(numericW, threshold);
@@ -1443,10 +1464,10 @@ class CompactPowerCard extends (window.LitElement ||
     this.classList.toggle("no-battery", !hasBattery);
 
     const pvLabelPositions = [
-      { x: 260, anchor: "anchor-right" },
-      { x: 340, anchor: "anchor-left" },
+      { x: sx(222), anchor: "anchor-right" },
+      { x: sx(290), anchor: "anchor-left" },
     ];
-    const pvLabelY = 36;
+    const pvLabelY = 28;
     const pvLabelItems = pvLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
       const attribute = lbl.attribute || null;
@@ -1482,8 +1503,8 @@ class CompactPowerCard extends (window.LitElement ||
     });
 
     const gridLabelPositions = [
-      { xPct: (32 / baseWidth) * 100, yPct: pctGridY(60) },
-      { xPct: (32 / baseWidth) * 100, yPct: pctGridY(36) },
+      { xPct: (sx(27) / baseWidth) * 100, yPct: pctGridY(46) },
+      { xPct: (sx(27) / baseWidth) * 100, yPct: pctGridY(28) },
     ];
     const gridLabelItems = gridLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
@@ -1517,8 +1538,8 @@ class CompactPowerCard extends (window.LitElement ||
     });
 
     const batteryLabelPositions = [
-      { xPct: (566 / baseWidth) * 100, yPct: pctGridY(60) },
-      { xPct: (566 / baseWidth) * 100, yPct: pctGridY(36) },
+      { xPct: (batteryIconX / baseWidth) * 100, yPct: pctGridY(46) },
+      { xPct: (batteryIconX / baseWidth) * 100, yPct: pctGridY(28) },
     ];
     const batteryLabelItems = batteryLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
@@ -1583,8 +1604,8 @@ class CompactPowerCard extends (window.LitElement ||
             })
             .filter(Boolean)
         : [];
-    const batteryDetailsLeft = batteryLabelPositions?.[0]?.xPct ?? (566 / baseWidth) * 100;
-    const batteryNodeY = pctGridY(76); // anchor at main battery icon row
+    const batteryDetailsLeft = (batteryIconX / baseWidth) * 100;
+    const batteryNodeY = pctGridY(58); // anchor at main battery icon row
     const batteryDetailsOffsetPx = 44; // vertical gap from the icon/label to the multi list
     const batteryDetailsTop = batteryNodeY + (batteryDetailsOffsetPx / viewHeight) * 100;
 
@@ -1597,23 +1618,23 @@ class CompactPowerCard extends (window.LitElement ||
         .filter(Boolean)
         .join(" ")}">
         <div class="canvas">
-          <svg viewBox="0 0 600 ${viewHeight}" preserveAspectRatio="xMidYMid meet">
+          <svg viewBox="0 0 ${baseWidth} ${viewHeight}" preserveAspectRatio="xMidYMid meet">
 
           <!-- Flow lines, updated endpoints -->
           <path id="line-pv-grid" class="flow-line"
-                d="M60 ${syGridBatt(86)} H282 A8 8 0 0 0 290 ${syGridBatt(78)} V70" fill="none" />
+                d="M${sx(51.2)} ${syGridBatt(65)} H${pvLeftBendX} A8 8 0 0 0 ${pvLeftArcEndX} ${syGridBatt(58)} V${sy(52)}" fill="none" />
           <line id="line-pv-home" class="flow-line"
-                x1="300" y1="70" x2="300" y2="${syHome(140)}" />
+                x1="${homeCenterX}" y1="${sy(52)}" x2="${homeCenterX}" y2="${syHome(106)}" />
           <path id="line-pv-battery" class="flow-line"
-                d="M310 70 V${syGridBatt(78)} A8 8 0 0 0 318 ${syGridBatt(86)} H540" fill="none" />
+                d="M${pvRightArcStartX} ${sy(52)} V${syGridBatt(58)} A8 8 0 0 0 ${pvRightArcEndX} ${syGridBatt(65)} H${sx(460.8)}" fill="none" />
           <path id="line-grid-home" class="flow-line"
-                d="M60 ${syGridBatt(106)} H260 Q280 ${syGridBatt(106)} 280 ${syGridBatt(126)} V${syHome(160)}" fill="none" />
+                d="M${sx(51.2)} ${syGridBatt(81.3)} H${gridHomeH1X} Q${gridHomeEndX} ${syGridBatt(81.3)} ${gridHomeEndX} ${syGridBatt(96.8)} V${syHome(122.7)} H${gridHomeEndX}" fill="none" />
           <path id="line-home-battery" class="flow-line"
-                d="M320 ${syHome(160)} V${syGridBatt(126)} Q320 ${syGridBatt(106)} 340 ${syGridBatt(106)} H540" fill="none" />
+                d="M${homeBatteryStartX} ${syHome(122.7)} V${syGridBatt(96.8)} Q${homeBatteryStartX} ${syGridBatt(81.3)} ${homeBatteryCtrl2X} ${syGridBatt(81.3)} H${sx(460.8)}" fill="none" />
 
           <circle id="dot-pv-home"      r="5" fill="${pvColor}" opacity="0" />
           <path id="arc-grid-battery" class="flow-line"
-                d="M60 ${syGridBatt(96)} H285 Q300 ${syGridBatt(76)} 315 ${syGridBatt(96)} H540"
+                d="M${gridLineStartX} ${gridArcY} H${gridArcStartX} Q${gridArcCtrlX} ${gridArcCtrlY} ${gridArcEndX} ${gridArcY} H${gridLineEndX}"
                 fill="none" />
 
           <!-- Remaining flow dots -->
@@ -1653,13 +1674,13 @@ class CompactPowerCard extends (window.LitElement ||
                   </div>`
                 )
               : ""}
-            <div class="overlay-item pv-section" style="left:${(300/baseWidth)*100}%; top:${pctBaseY(36)}%;">
+            <div class="overlay-item pv-section" style="left:${(sx(256)/baseWidth)*100}%; top:${pctBaseY(24)}%;">
               <div class="node-marker pv-marker clickable" @click=${() => this._openMoreInfo(pvCfg.entity)}>
                 <div class="node-label" style="color:${pvColor}; opacity:${pvLabelHidden ? 0 : pvOpacity};">${renderValue(pvVal)}</div>
                 <ha-icon icon="mdi:solar-panel" style="color:${pvColor}; opacity:1; filter:${!this._isLightTheme() && pvNumeric !== 0 ? `drop-shadow(0 0 10px ${pvColor})` : "none"};"></ha-icon>
               </div>
             </div>
-            <div class="overlay-item anchor-left" style="left:${(26/baseWidth)*100}%; top:${pctGridY(108)}%;">
+            <div class="overlay-item anchor-left" style="left:${(gridIconX/baseWidth)*100}%; top:${pctGridY(85)}%;">
               <div class="node-marker grid-marker left clickable" @click=${() => this._openMoreInfo(gridCfg.entity)}>
                 <ha-icon icon="mdi:transmission-tower" style="color:${gridColor}; opacity:1; filter:${!this._isLightTheme() && gridNumeric !== 0 ? `drop-shadow(0 0 10px ${gridColor})` : "none"};"></ha-icon>
                 <div class="node-label left" style="color:${gridColor}; opacity:${gridLabelHidden ? 0 : gridOpacity};">
@@ -1670,7 +1691,7 @@ class CompactPowerCard extends (window.LitElement ||
                 </div>
               </div>
             </div>
-            <div class="overlay-item" style="left:${(300/baseWidth)*100}%; top:${pctHomeY(176)}%;">
+            <div class="overlay-item" style="left:${(homeCenterX/baseWidth)*100}%; top:${pctHomeY(135)}%;">
               <div class="home-marker clickable" @click=${() => this._openMoreInfo(homeCfg.entity)}>
                 <ha-icon
                   icon="mdi:home"
@@ -1680,7 +1701,7 @@ class CompactPowerCard extends (window.LitElement ||
               </div>
             </div>
             ${hasBattery
-              ? html`<div class="overlay-item anchor-right battery-section" style="left:${(572/baseWidth)*100}%; top:${pctGridY(108)}%;">
+              ? html`<div class="overlay-item anchor-right battery-section" style="left:${(batteryIconX/baseWidth)*100}%; top:${pctGridY(85)}%;">
                   <div class="node-marker battery-marker right ${batteryDetails.length ? "" : "clickable"}" @click=${() => {
                     if (!batteryDetails.length) this._openMoreInfo(batteryCfg.entity);
                   }}>
@@ -1696,11 +1717,11 @@ class CompactPowerCard extends (window.LitElement ||
               : ""}
             ${batteryDetails.length
               ? html`<div class="overlay-item anchor-right-top" style="left:${batteryDetailsLeft}%; top:${batteryDetailsTop}%;">
-                  <div class="battery-multi" style="margin-top: 14px;">
+                  <div class="battery-multi" style="margin-right: 6px; margin-top: 6px;">
                     ${batteryDetails.map(
                       (b) => html`<div
                         class="battery-multi-item clickable"
-                        style="color:${b.color}; opacity:${b.opacity};"
+                        style="margin-top: -6px; color:${b.color}; opacity:${b.opacity};"
                         @click=${() => this._openMoreInfo(b.entity)}
                       >
                         <div class="aux-label" style="padding-top: 0px; padding-bottom: 0px; margin-top: 4px; padding-left: 1px; padding-right: 1px;">
@@ -1727,22 +1748,11 @@ class CompactPowerCard extends (window.LitElement ||
           </div>
         </div>
       </ha-card>
-      </ha-card>
     `;
   }
 
   getCardSize() {
     return 2;
-  }
-
-  get html() {
-    return (window.LitElement ||
-      Object.getPrototypeOf(customElements.get("ha-panel-lovelace"))).prototype.html;
-  }
-
-  static get css() {
-    return (window.LitElement ||
-      Object.getPrototypeOf(customElements.get("ha-panel-lovelace"))).prototype.css;
   }
 }
 

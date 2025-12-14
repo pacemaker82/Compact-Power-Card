@@ -95,7 +95,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .pv-label {
-        font-size: calc(13px * var(--cpc-scale, 1));
+        font-size: calc(16px * var(--cpc-scale, 1));
       }
 
       .node-marker {
@@ -138,7 +138,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .node-label {
-        font-size: calc(13px * var(--cpc-scale, 1));
+        font-size: calc(16px * var(--cpc-scale, 1));
         display: flex;
         align-items: center;
         gap: 2px;
@@ -186,7 +186,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .home-label {
-        font-size: calc(13px * var(--cpc-scale, 1));
+        font-size: calc(16px * var(--cpc-scale, 1));
         font-weight: 700;
         margin-top: -10px;
       }
@@ -219,7 +219,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .aux-label {
-        font-size: calc(10px * var(--cpc-scale, 1));
+        font-size: calc(12px * var(--cpc-scale, 1));
       }
 
       .pv-label,

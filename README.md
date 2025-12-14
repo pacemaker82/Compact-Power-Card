@@ -133,7 +133,7 @@ Aux sources are up to 8 power sources within your home that you want to show in 
 | Source attribute        | `attribute`             | Read from an attribute instead of state.                                         |
 | Icon             | `icon`                  | Optional icon for the source badge.                                              |
 | Color            | `color`                 | Optional color override for that source.                                         |
-| Threshold        | `threshold`             | Dims/zeros source below threshold (per `threshold_mode`).                        |
+| Threshold        | `threshold`             | Dims/zeros source below threshold (in watts) (per `threshold_mode`).                        |
 | Decimals         | `decimal_places`        | Decimal places for that source.                                                  |
 | Unit of Measurement             | `unit` / `unit_of_measurement` | Display unit override for that source.                       |
 | Subtract from home?      | `subtract_from_home`      | If true (default), subtract summed aux usage from home value/calculation.        |
@@ -168,7 +168,7 @@ Labels can be used to display "other" information - that can be more power stats
 | Label attribute | `attribute`       | Read from an attribute instead of state.                             |
 | Icon    | `icon`              | Optional icon shown next to the label.                               |
 | Color   | `color`             | Optional color override for the label text/icon.                     |
-| Threshold | `threshold`       | Dims/hides label when below threshold (per `threshold_mode`).        |
+| Threshold | `threshold`       | Dims/hides label when below threshold (in watts) (per `threshold_mode`).        |
 | Decimals | `decimal_places`   | Decimal places for that label.                                       |
 | Unit of Measurement    | `.unit` / `labels[].unit_of_measurement` | Display unit override for that label.                    |
 

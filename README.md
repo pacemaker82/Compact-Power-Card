@@ -53,6 +53,7 @@ entities:
 | Name           | Setting slug    | What it does                                                                                   |
 | -------------- | --------------- | ---------------------------------------------------------------------------------------------- |
 | Threshold mode | `threshold_mode`| Chooses whether sub-threshold values are zeroed in math (`calculations`) or only dimmed (`display_only`). |
+| Power Unit Override | `power_unit`| set to W, kW or mW |
 
 In display_only mode:
 
@@ -190,7 +191,7 @@ Example of a label setup:
 - kWh values auto-convert to MWh when ≥ 1000 kWh.
 - `decimal_places` controls formatting everywhere the value is shown.
 - `unit|unit_of_measurement` overrides display text only; calculations always use numeric state/attribute.
-- `threshold` should be set based on the source unit of measurement. So "0.1" if kW versus "100" if watts.
+- `threshold` should be set in watts.
 
 ## Card Configuration Example:
 

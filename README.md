@@ -53,7 +53,6 @@ entities:
 | Name           | Setting slug    | What it does                                                                                   |
 | -------------- | --------------- | ---------------------------------------------------------------------------------------------- |
 | Threshold mode | `threshold_mode`| Chooses whether sub-threshold values are zeroed in math (`calculations`) or only dimmed (`display_only`). |
-| Card Height Factor | `height_factor`| Default: 1.0, set it if you want the height of the card to be bigger, e.g. 1.5, 2.0 |
 
 In display_only mode:
 

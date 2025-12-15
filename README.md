@@ -10,7 +10,6 @@
 
 <img width="680" height="196" alt="Screenshot 2025-12-15 at 11 13 44" src="https://github.com/user-attachments/assets/302a07cb-f94a-443d-b844-ab9c736b05c5" />
 
-
 Inspired by the excellent [power flow card plus](https://github.com/flixlix/power-flow-card-plus) - A compact power card for Home Assistant that supports a tighter user experience, and 8 power devices/feeds from the home in a single card. In addition, the card can show 6 entity labels for whatever you want, colour and configure them how you need.
 
 ## Functionality
@@ -101,6 +100,7 @@ Common keys for `pv`, `grid`, `home`, `battery`. The following settings are poss
 | ------------------- | ----------------------- | ------------------------------------------------------------------------------- |
 | Battery SoC Entity | `battery_soc`   | Sensor/entity id for the battery SoC. Only use under `battery` entity.     |
 | Show SoC            | `show_soc`              | If true, appends `| {soc}%` to the battery power label when a SoC source is configured. Default: false. |
+| Capacity          | `battery_capacity`              | Set the capacity of the battery in kWh, e.g. `9.5` |
 
 Example of a basic setup:
 
@@ -124,16 +124,21 @@ The card supports many combinations: PV/Grid/Home/Battery, PV/Grid/Home, Battery
 
 ### Supporting multiple batteries
 
-The card will support more than 1 battery, this is experimental at the moment. Each battery can have a soc entity too. 
+The card will support more than 1 battery, this is experimental at the moment. Each battery can have a soc and capacity entity too.
+
+The UI will calculate your % of battery available across multiple batteries. If you just provide the `battery_soc` it will be an average across the SoCs. If you also provide the `battery_capacity` it will calculate a weighted average across the batteries.
 
 ```yaml
 entities:
   battery:
     - entity: sensor.battery_power_1
     - entity: sensor.battery_power_2
+      battery_soc: sensor.battery_soc2
+      battery_capacity: 9.5    
     - entity: sensor.battery_power_3
       color: "#ff0000"
-      battery_soc: sensor.battery_soc
+      battery_soc: sensor.battery_soc3
+      battery_capacity: 9.5
       show_soc: true
 ```
 

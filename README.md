@@ -46,7 +46,7 @@ entities:
 
 ## Managing the size of the card
 
-This card is designed for the new [Home Assistant Sections UI](https://www.home-assistant.io/dashboards/sections/), introduced in 2014. This allows you to scale the card horizontally or vertically as you see fit. The card will dynamically resize to fit the rows and columns you setup in the card UI:
+This card is designed for the new [Home Assistant Sections UI](https://www.home-assistant.io/dashboards/sections/), introduced in 2024. This allows you to scale the card horizontally or vertically as you see fit. The card will dynamically resize to fit the rows and columns you setup in the card UI:
 
 <img width="1003" height="750" alt="Screenshot 2025-12-15 at 16 05 36" src="https://github.com/user-attachments/assets/f176dea8-f834-4ece-a12e-358fc5661700" />
 

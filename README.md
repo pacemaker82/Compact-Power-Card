@@ -24,6 +24,8 @@ Inspired by the excellent [power flow card plus](https://github.com/flixlix/powe
 
 ## Installation
 
+Custom Power Card should be available in the HACS store by default, simply search for it. If you cannot find it, follow the instructions below:
+
 1. Goto HACS (if you dont have that installed, install HACS)
 2. Add a custom repository
 3. Add the URL to this repo: `https://github.com/pacemaker82/Compact-Power-Card` using the category `Dashboard` (used to be `Lovelace` pre HACS 2.0.0)

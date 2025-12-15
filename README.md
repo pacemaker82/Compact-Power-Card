@@ -2,7 +2,7 @@
 
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/total?label=Total%20Downloads) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/latest/total?label=Latest%20Version)
 
-<img width="908" height="582" alt="Screenshot 2025-12-15 at 11 54 01" src="https://github.com/user-attachments/assets/34ab6519-5970-4b75-80b9-921b7e870da7" />
+<img width="908" height="581" alt="Screenshot 2025-12-15 at 11 56 29" src="https://github.com/user-attachments/assets/a4ba6978-55f0-43a6-a15c-2c846be1e6bc" />
 
 Inspired by the excellent [power flow card plus](https://github.com/flixlix/power-flow-card-plus) - A compact power card for Home Assistant that supports a tighter user experience, and 8 power devices/feeds from the home in a single card. In addition, the card can show 6 entity labels for whatever you want, colour and configure them how you need.
 

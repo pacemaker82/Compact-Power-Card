@@ -180,7 +180,7 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .node-marker ha-icon {
-        --mdc-icon-size: calc(28px * var(--cpc-scale, 1));
+        --mdc-icon-size: calc(32px * var(--cpc-scale, 1));
         filter: drop-shadow(0 0 0 rgba(0,0,0,0));
       }
 
@@ -374,11 +374,13 @@ class CompactPowerCard extends (window.LitElement ||
           const newW = rect.width;
           const newH = rect.height;
           this._hostWidth = newW;
+          this._hostHeight = newH;
           if (this._externalHeight == null) {
             this._externalHeight = newH;
           } else {
-            const deltaH = Math.abs(newH - this._externalHeight);
-            if (deltaH > 4) this._externalHeight = newH;
+            const grow = newH > this._externalHeight + 2;
+            const shrink = newH < this._externalHeight - 24; // allow only meaningful external shrink
+            if (grow || shrink) this._externalHeight = newH;
           }
         }
         this._updateScale();
@@ -992,76 +994,149 @@ class CompactPowerCard extends (window.LitElement ||
     const designHeight = 184;
     const defaultWidth = 512;
     const defaultHeight = 184;
-    const baseWidth = Math.max(512, this._hostWidth || defaultWidth);
-    const baseHeight = Math.max(184, this._externalHeight || defaultHeight);
-    const extraHeight = Math.max(0, baseHeight - designHeight);
+    const hostRect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
+    const outerWidth = this._hostWidth != null ? this._hostWidth : hostRect?.width || defaultWidth;
+    const outerHeight = this._hostHeight != null ? this._hostHeight : hostRect?.height || defaultHeight;
+    const padX = 8; // ha-card left+right padding (4px each)
+    const padY = 2; // bottom padding; top is 0
+    const baseWidth = Math.max(0, outerWidth - padX);
+    const hasExternalHeight = outerHeight > defaultHeight + 32; // require meaningful external height to avoid slow creep
+    const baseHeight = hasExternalHeight ? Math.max(0, outerHeight - padY) : designHeight;
+    const renderScaleY = baseHeight > 0 ? (outerHeight - padY) / baseHeight : 1;
+    const xScale = baseWidth / designWidth;
+    const yScale = baseHeight / designHeight;
     const anchorLeftX = 51.2;
-    const anchorRightMargin = 51.2;
-    const designUsableWidth = designWidth - anchorLeftX - anchorRightMargin;
-    const usableWidth = Math.max(10, baseWidth - anchorLeftX - anchorRightMargin);
-    const sx = (v) => anchorLeftX + ((v - anchorLeftX) / designUsableWidth) * usableWidth;
+    const sx = (v) => v * xScale;
     const yOffset = 4;
-    const sy = (v) => v + yOffset; // keep base coords stable in Y; extra height applied below
-    const syHome = (v) => sy(v) + extraHeight;
-    const syGridBatt = (v) => sy(v) + extraHeight * 0.5;
+    const syTop = (v) => v + yOffset; // fixed from top
+    const sy = syTop;
+    const syHome = (v) => baseHeight - (designHeight - (v + yOffset)); // fixed from bottom
+    const syGridBatt = (v) => (v + yOffset) * yScale; // scales with height for grid/battery row
     const homeCenterX = baseWidth / 2;
-    const homeLineOffset = 17;
-    const gridHomeEndX = homeCenterX - homeLineOffset;
-    const homeBatteryStartX = homeCenterX + homeLineOffset;
     const pvCenterX = homeCenterX;
-    const pvLeftBendX = pvCenterX - 16; // 240 at default
-    const pvLeftArcEndX = pvCenterX - 8.5; // 247.5 at default
-    const pvRightArcStartX = pvCenterX + 8.5; // 264.5 at default
-    const pvRightArcEndX = pvCenterX + 15; // 271 at default
-    const homeAnchorX = homeCenterX;
-    const homeAnchorY = syHome(135);
-    const batteryAnchorX = sx(488);
-    const batteryAnchorY = syGridBatt(86);
-    const gridAnchorX = sx(anchorLeftX);
-    const gridMidY = syGridBatt(81.3);
-    const gridArcY = syGridBatt(73.6);
-    const gridLineStartX = sx(35);
-    const gridLineEndX = sx(477);
+    const pvNodeY = sy(52);
+    const homeAnchorY = syHome(131);
+    const homeLineEndY = Math.max(0, homeAnchorY - 6);
+    const gridLineStartX = 35; // fixed distance from left
+    const gridLineEndX = baseWidth - 35; // fixed distance from right
+    const gridNodeY = syGridBatt(86);
+    const gridPvStartY = gridNodeY - 10; // start 10px above grid/battery baseline
+    const humpHeight = 7;
+    const humpHeightAdj = humpHeight / renderScaleY; // keep 10px on screen even if viewBox scales
+    const gridBatteryCtrlX = baseWidth / 2; // keep hump centered near home/PV line
+    const gridBatteryCtrlY = gridNodeY - humpHeightAdj; // fixed hump height (screen px)
+    const humpWidth = 22; // tighter hump span
+    const humpStartX = homeCenterX - humpWidth / 2;
+    const humpEndX = homeCenterX + humpWidth / 2;
+    const humpPeakY = gridNodeY - humpHeightAdj; // fixed hump height (screen px)
+    const humpCtrlInX = humpStartX + humpWidth * 0.25;
+    const humpCtrlOutX = humpEndX - humpWidth * 0.25;
+    const pvGridEndX = homeCenterX - 10; // 10px left of home center
+    const pvGridTurnRadius = 8; // slightly larger radius for the grid→PV corner
+    const pvBatteryStartX = homeCenterX + 10; // shift PV→Battery start 10px right of center
+    const pvBatteryEndY = gridNodeY - 10; // lift PV→Battery end 10px above grid/battery baseline
+    const gridHomeStartY = gridNodeY + 10; // drop grid→home start 10px below grid/battery baseline
+    const gridHomeEndX = homeCenterX - 10; // end 10px left of home center
+    const batteryHomeStartY = gridNodeY + 10; // drop battery→home start 10px below grid/battery baseline
+    const batteryHomeEndX = homeCenterX + 10; // end 10px right of home center
+    const pvNode = { x: pvCenterX, y: pvNodeY };
+    const gridNode = { x: gridLineStartX, y: gridNodeY };
+    const batteryNode = { x: gridLineEndX, y: gridNodeY };
+    const homeNode = { x: homeCenterX, y: homeLineEndY };
 
-    // Geometry updated for marker positions:
-    // PV marker anchor around (300,75) – below icon/label
-    // GRID marker anchor around (60,75) inset to allow label width near edge
-    // HOME marker anchor around (300,150)
-    // BATTERY marker anchor around (540,75) inset equally to allow label width
+    // Straight-line geometry between anchor points
     const geom = {
-      "pv-grid": { mode: "line", x1: pvLeftArcEndX, y1: sy(52), x2: gridLineStartX, y2: syGridBatt(65) },
-      "pv-home": { mode: "line", x1: homeCenterX, y1: sy(52), x2: homeCenterX, y2: syHome(106) },
-      "pv-battery": { mode: "line", x1: pvRightArcStartX, y1: sy(52), x2: gridLineEndX, y2: syGridBatt(65) },
+      // Grid → PV: right angle (horizontal then vertical), same anchors
+      "pv-grid": {
+        mode: "path",
+        pathId: "line-pv-grid",
+        fallback: { mode: "line", x1: gridNode.x, y1: gridPvStartY, x2: pvGridEndX, y2: pvNode.y },
+      },
+      "pv-home": { mode: "line", x1: pvNode.x, y1: pvNode.y, x2: homeNode.x, y2: homeNode.y },
+      // PV → Battery: right angle (horizontal then vertical), same anchors
+      "pv-battery": {
+        mode: "path",
+        pathId: "line-pv-battery",
+        fallback: { mode: "line", x1: pvBatteryStartX, y1: pvNode.y, x2: batteryNode.x, y2: pvBatteryEndY },
+      },
 
-      "grid-home": { mode: "path", pathId: "line-grid-home" },
-      "battery-home": { mode: "line", x1: gridLineEndX, y1: syGridBatt(81.3), x2: homeBatteryStartX, y2: syHome(122.7) },
+      // Grid → Home: right angle (horizontal then vertical), same anchors
+      "grid-home": {
+        mode: "path",
+        pathId: "line-grid-home",
+        fallback: { mode: "line", x1: gridNode.x, y1: gridHomeStartY, x2: gridHomeEndX, y2: homeNode.y },
+      },
+      // Battery → Home: right angle (horizontal then vertical), same anchors
+      "battery-home": {
+        mode: "path",
+        pathId: "line-home-battery",
+        fallback: { mode: "line", x1: batteryNode.x, y1: batteryHomeStartY, x2: batteryHomeEndX, y2: homeNode.y },
+      },
 
-      "grid-battery": { mode: "line", x1: gridLineStartX, y1: syGridBatt(73.6), x2: gridLineEndX, y2: syGridBatt(73.6) },
-      "battery-grid": { mode: "line", x1: gridLineEndX, y1: syGridBatt(73.6), x2: gridLineStartX, y2: syGridBatt(73.6) },
+      "grid-battery": {
+        mode: "path",
+        pathId: "arc-grid-battery",
+        fallback: { mode: "line", x1: gridNode.x, y1: gridNode.y, x2: batteryNode.x, y2: batteryNode.y },
+        ctrlX: gridBatteryCtrlX,
+        ctrlY: gridBatteryCtrlY,
+      },
+      "battery-grid": {
+        mode: "path",
+        pathId: "arc-grid-battery",
+        fallback: { mode: "line", x1: batteryNode.x, y1: batteryNode.y, x2: gridNode.x, y2: gridNode.y },
+        ctrlX: gridBatteryCtrlX,
+        ctrlY: gridBatteryCtrlY,
+      },
     };
 
     // Let flow dots follow the current drawn geometry (lines/paths) when updated.
     geom["pv-grid"] = parsePathGeom(
       "line-pv-grid",
-      parseLineGeom("line-pv-grid", geom["pv-grid"]),
+      { mode: "line", x1: gridNode.x, y1: gridPvStartY, x2: pvGridEndX, y2: pvNode.y },
       true
     );
     geom["pv-battery"] = parsePathGeom(
       "line-pv-battery",
-      parseLineGeom("line-pv-battery", geom["pv-battery"])
+      { mode: "line", x1: pvBatteryStartX, y1: pvNode.y, x2: batteryNode.x, y2: pvBatteryEndY },
+      false
     );
     geom["pv-home"] = parseLineGeom("line-pv-home", geom["pv-home"]);
     geom["grid-battery"] = parsePathGeom(
       "arc-grid-battery",
-      parseLineGeom("arc-grid-battery", geom["grid-battery"])
+      {
+        mode: "quad",
+        x0: gridNode.x,
+        y0: gridNode.y,
+        cx: gridBatteryCtrlX,
+        cy: gridBatteryCtrlY,
+        x1: batteryNode.x,
+        y1: batteryNode.y,
+      },
+      false
     );
     geom["battery-grid"] = parsePathGeom(
       "arc-grid-battery",
-      parseLineGeom("arc-grid-battery", geom["battery-grid"]),
+      {
+        mode: "quad",
+        x0: batteryNode.x,
+        y0: batteryNode.y,
+        cx: gridBatteryCtrlX,
+        cy: gridBatteryCtrlY,
+        x1: gridNode.x,
+        y1: gridNode.y,
+      },
       true
     );
-    geom["grid-home"] = parsePathGeom("line-grid-home", geom["grid-home"]);
-    geom["battery-home"] = parsePathGeom("line-home-battery", geom["battery-home"], true);
+    geom["grid-home"] = parsePathGeom(
+      "line-grid-home",
+      { mode: "line", x1: gridNode.x, y1: gridHomeStartY, x2: gridHomeEndX, y2: homeNode.y },
+      false
+    );
+    geom["battery-home"] = parsePathGeom(
+      "line-home-battery",
+      { mode: "line", x1: batteryNode.x, y1: batteryHomeStartY, x2: batteryHomeEndX, y2: homeNode.y },
+      false
+    );
 
     const lineIdMap = {
       "pv-grid": "line-pv-grid",
@@ -1321,41 +1396,54 @@ class CompactPowerCard extends (window.LitElement ||
     const defaultWidth = 512;
     const defaultHeight = 184;
     const hostRect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
-    const baseWidth = Math.max(512, this._hostWidth || hostRect?.width || defaultWidth);
-    const baseHeight = Math.max(184, this._externalHeight || defaultHeight);
-    const extraHeight = Math.max(0, baseHeight - designHeight);
+    const outerWidth = this._hostWidth != null ? this._hostWidth : hostRect?.width || defaultWidth;
+    const outerHeight = this._hostHeight != null ? this._hostHeight : hostRect?.height || defaultHeight;
+    const padX = 8; // ha-card left+right padding (4px each)
+    const padY = 2; // bottom padding; top is 0
+    const baseWidth = Math.max(0, outerWidth - padX);
+    const hasExternalHeight = outerHeight > defaultHeight + 32; // require meaningful external height to avoid slow creep
+    const baseHeight = hasExternalHeight ? Math.max(0, outerHeight - padY) : designHeight;
+    const renderScaleY = baseHeight > 0 ? (outerHeight - padY) / baseHeight : 1;
+    const xScale = baseWidth / designWidth;
+    const yScale = baseHeight / designHeight;
     const viewHeight = baseHeight;
     const anchorLeftX = 51.2;
-    const anchorRightMargin = 51.2;
-    const designUsableWidth = designWidth - anchorLeftX - anchorRightMargin;
-    const usableWidth = Math.max(10, baseWidth - anchorLeftX - anchorRightMargin);
-    const sx = (v) => anchorLeftX + ((v - anchorLeftX) / designUsableWidth) * usableWidth;
+    const sx = (v) => v * xScale;
     const yOffset = 4;
-    const sy = (v) => v + yOffset; // keep base coords stable in Y; we’ll add extra height only where needed
-    const syHome = (v) => sy(v) + extraHeight; // home row grows downward with height
-    const syGridBatt = (v) => sy(v) + extraHeight * 0.5; // mid rows grow halfway
+    const syTop = (v) => v + yOffset; // keep fixed distance from top
+    const sy = syTop;
+    const syHome = (v) => baseHeight - (designHeight - (v + yOffset)); // keep fixed distance from bottom
+    const syGridBatt = (v) => (v + yOffset) * yScale; // scale mid rows with height
     const homeCenterX = baseWidth / 2;
-    const homeLineOffset = 17;
-    const gridHomeEndX = homeCenterX - homeLineOffset;
-    const homeBatteryStartX = homeCenterX + homeLineOffset;
-    const gridHomeH1X = gridHomeEndX - homeLineOffset; // 17px inset before curve
-    const homeBatteryCtrl2X = homeBatteryStartX + homeLineOffset; // second control 17px out
     const pvCenterX = homeCenterX;
-    const pvLeftBendX = pvCenterX - 16; // 240 at default
-    const pvLeftArcEndX = pvCenterX - 8.5; // 247.5 at default
-    const pvRightArcStartX = pvCenterX + 8.5; // 264.5 at default
-    const pvRightArcEndX = pvCenterX + 15; // 271 at default
-    const gridLineStartX = sx(35);
-    const gridLineEndX = sx(477);
-    const gridArcMidX = (gridLineStartX + gridLineEndX) / 2;
-    const gridArcHalfWidth = 12.8; // half of 25.6px
-    const gridArcStartX = gridArcMidX - gridArcHalfWidth;
-    const gridArcEndX = gridArcMidX + gridArcHalfWidth;
-    const gridArcCtrlX = gridArcMidX;
-    const gridArcY = syGridBatt(73.6);
-    const gridArcCtrlY = gridArcY - 15.3; // hump rises 15.3px above midline
-    const rawWidthScale = baseWidth / designWidth;
-    const widthScale = rawWidthScale > 1 ? 0.85 : rawWidthScale;
+    const pvNodeY = sy(52);
+    const homeAnchorY = syHome(131);
+    const homeLineEndY = Math.max(0, homeAnchorY - 6);
+    const gridLineStartX = 35; // fixed distance from left
+    const gridLineEndX = baseWidth - 35; // fixed distance from right
+    const gridNodeY = syGridBatt(86);
+    const gridPvStartY = gridNodeY - 10; // start 10px above grid/battery baseline
+    const humpWidth = 22; // tighter hump span
+    const humpHeight = 7;
+    const humpHeightAdj = humpHeight / renderScaleY; // keep fixed screen px
+    const humpStartX = homeCenterX - humpWidth / 2;
+    const humpEndX = homeCenterX + humpWidth / 2;
+    const humpPeakY = gridNodeY - humpHeightAdj;
+    const humpCtrlInX = humpStartX + humpWidth * 0.25;
+    const humpCtrlOutX = humpEndX - humpWidth * 0.25;
+    const pvGridEndX = homeCenterX - 10; // Grid->PV ends 10px left of center
+    const pvGridTurnRadius = 8; // slightly larger radius for the grid→PV corner
+    const pvBatteryStartX = homeCenterX + 10; // shift PV→Battery start 10px right of center
+    const pvBatteryEndY = gridNodeY - 10; // lift PV→Battery end 10px above grid/battery baseline
+    const gridHomeStartY = gridNodeY + 10; // drop grid→home start 10px below grid/battery baseline
+    const gridHomeEndX = homeCenterX - 10; // end 10px left of home center
+    const batteryHomeStartY = gridNodeY + 10; // drop battery→home start 10px below grid/battery baseline
+    const batteryHomeEndX = homeCenterX + 10; // end 10px right of home center
+    const pvNode = { x: pvCenterX, y: pvNodeY };
+    const gridNode = { x: gridLineStartX, y: gridNodeY };
+    const batteryNode = { x: gridLineEndX, y: gridNodeY };
+    const homeNode = { x: homeCenterX, y: homeLineEndY };
+    const widthScale = 1;
     const iconOffset = 26 * widthScale;
     const gridIconX = gridLineStartX - iconOffset; // offset from line start, scale with width
     const batteryIconX = gridLineEndX + iconOffset; // offset from line end, scale with width
@@ -1541,17 +1629,18 @@ class CompactPowerCard extends (window.LitElement ||
     const homeRowYBase = 145; // base Y for aux row; actual Y will be adjusted via pctHomeY
     const maxDevices = Math.min(normalizedSources.length, 8);
     if (maxDevices > 0) {
-      const rawOffsets = [50, 100, 150, 200];
-      const offsets = rawOffsets; // keep original spacing regardless of width
-      const pad = Math.max(16, baseWidth * 0.05);
+      // Build outward from the home icon; keep symmetric spacing and respect padding.
+      const hostWidthActual = this._hostWidth || hostRect?.width || baseWidth;
+      const deviceWidth = Math.max(200, hostWidthActual); // guard against tiny widths
+      const pad = Math.max(16, deviceWidth * 0.05);
+      const spacing = Math.max(44, (deviceWidth - pad * 2) / 10); // base spacing; spreads as width grows
+
       for (let i = 0; i < maxDevices; i++) {
-        const isLeft = i % 2 === 0;
-        const idx = Math.floor(i / 2);
-        const off = offsets[idx] || offsets[offsets.length - 1];
-        const x = isLeft ? homeX - off : homeX + off;
-        const clampedX = Math.max(pad, Math.min(baseWidth - pad, x));
-        const pct = (clampedX / baseWidth) * 100;
-        sourcePositions.push({ x: clampedX, y: homeRowYBase, leftPct: pct });
+        const ring = Math.floor(i / 2) + 1; // 1,1,2,2,3,3...
+        const dir = i % 2 === 0 ? -1 : 1; // left, right alternating
+        const rawX = homeX + dir * spacing * ring;
+        const clampedX = Math.max(pad, Math.min(deviceWidth - pad, rawX));
+        sourcePositions.push({ x: clampedX, y: homeRowYBase, leftPct: (clampedX / deviceWidth) * 100 });
       }
     }
 
@@ -1633,9 +1722,11 @@ class CompactPowerCard extends (window.LitElement ||
       };
     });
 
+    const gridIconTop = gridNodeY + 9;
+    const batteryIconTop = gridNodeY + 9;
     const gridLabelPositions = [
-      { xPct: ((gridIconX + 6) / baseWidth) * 100, yPct: pctGridY(46) },
-      { xPct: ((gridIconX + 6) / baseWidth) * 100, yPct: pctGridY(28) },
+      { xPct: ((gridIconX + 6) / baseWidth) * 100, yPx: gridNodeY - 30 },
+      { xPct: ((gridIconX + 6) / baseWidth) * 100, yPx: gridNodeY - 48 },
     ];
     const gridLabelItems = gridLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
@@ -1663,14 +1754,14 @@ class CompactPowerCard extends (window.LitElement ||
         opacity,
         hidden,
         xPct: pos.xPct,
-        yPct: pos.yPct,
+        yPx: pos.yPx,
         numeric: numericW,
       };
     });
 
     const batteryLabelPositions = [
-      { xPct: ((batteryIconX - 5) / baseWidth) * 100, yPct: pctGridY(46) },
-      { xPct: ((batteryIconX - 5) / baseWidth) * 100, yPct: pctGridY(28) },
+      { xPct: ((batteryIconX - 5) / baseWidth) * 100, yPx: gridNodeY - 30 },
+      { xPct: ((batteryIconX - 5) / baseWidth) * 100, yPx: gridNodeY - 48 },
     ];
     const batteryLabelItems = batteryLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
@@ -1698,7 +1789,7 @@ class CompactPowerCard extends (window.LitElement ||
         opacity,
         hidden,
         xPct: pos.xPct,
-        yPct: pos.yPct,
+        yPx: pos.yPx,
         numeric: numericW,
       };
     });
@@ -1750,9 +1841,9 @@ class CompactPowerCard extends (window.LitElement ||
             .filter(Boolean)
         : [];
     const batteryDetailsLeft = (batteryIconX / baseWidth) * 100;
-    const batteryNodeY = pctGridY(58); // anchor at main battery icon row
+    const batteryListAnchor = gridNodeY - 18; // align list a bit above node
     const batteryDetailsOffsetPx = 44; // vertical gap from the icon/label to the multi list
-    const batteryDetailsTop = batteryNodeY + (batteryDetailsOffsetPx / viewHeight) * 100;
+    const batteryDetailsTopPx = batteryListAnchor + batteryDetailsOffsetPx;
 
 
     return html`
@@ -1765,30 +1856,28 @@ class CompactPowerCard extends (window.LitElement ||
         <div class="canvas">
           <svg viewBox="0 0 ${baseWidth} ${viewHeight}" preserveAspectRatio="xMidYMid meet">
 
-          <!-- Flow lines, updated endpoints -->
-          <path id="line-pv-grid" class="flow-line"
-                d="M${gridLineStartX} ${syGridBatt(65)} H${pvLeftBendX} A8 8 0 0 0 ${pvLeftArcEndX} ${syGridBatt(58)} V${sy(52)}" fill="none" />
+          <!-- Flow lines, updated endpoints (straight lines) -->
+          <path id="line-pv-grid" class="flow-line" fill="none"
+                d="M${gridLineStartX} ${gridPvStartY} H${pvGridEndX - pvGridTurnRadius} A${pvGridTurnRadius} ${pvGridTurnRadius} 0 0 0 ${pvGridEndX} ${gridPvStartY - pvGridTurnRadius} V${pvNode.y}" />
           <line id="line-pv-home" class="flow-line"
-                x1="${homeCenterX}" y1="${sy(52)}" x2="${homeCenterX}" y2="${syHome(106)}" />
-          <path id="line-pv-battery" class="flow-line"
-                d="M${pvRightArcStartX} ${sy(52)} V${syGridBatt(58)} A8 8 0 0 0 ${pvRightArcEndX} ${syGridBatt(65)} H${gridLineEndX}" fill="none" />
-          <path id="line-grid-home" class="flow-line"
-                d="M${gridLineStartX} ${syGridBatt(81.3)} H${gridHomeH1X} Q${gridHomeEndX} ${syGridBatt(81.3)} ${gridHomeEndX} ${syGridBatt(96.8)} V${syHome(122.7)} H${gridHomeEndX}" fill="none" />
-          <path id="line-home-battery" class="flow-line"
-                d="M${homeBatteryStartX} ${syHome(122.7)} V${syGridBatt(96.8)} Q${homeBatteryStartX} ${syGridBatt(81.3)} ${homeBatteryCtrl2X} ${syGridBatt(81.3)} H${gridLineEndX}" fill="none" />
-
-          <circle id="dot-pv-home"      r="5" fill="${pvColor}" opacity="0" />
-          <path id="arc-grid-battery" class="flow-line"
-                d="M${gridLineStartX} ${gridArcY} H${gridArcStartX} Q${gridArcCtrlX} ${gridArcCtrlY} ${gridArcEndX} ${gridArcY} H${gridLineEndX}"
-                fill="none" />
+                x1="${pvNode.x}" y1="${pvNode.y}" x2="${homeNode.x}" y2="${homeNode.y}" />
+          <path id="line-pv-battery" class="flow-line" fill="none"
+                d="M${pvBatteryStartX} ${pvNode.y} V${pvBatteryEndY - pvGridTurnRadius} A${pvGridTurnRadius} ${pvGridTurnRadius} 0 0 0 ${pvBatteryStartX + pvGridTurnRadius} ${pvBatteryEndY} H${batteryNode.x}" />
+          <path id="line-grid-home" class="flow-line" fill="none"
+                d="M${gridNode.x} ${gridHomeStartY} H${gridHomeEndX - pvGridTurnRadius} A${pvGridTurnRadius} ${pvGridTurnRadius} 0 0 1 ${gridHomeEndX} ${gridHomeStartY + pvGridTurnRadius} V${homeNode.y}" />
+          <path id="line-home-battery" class="flow-line" fill="none"
+                d="M${batteryNode.x} ${batteryHomeStartY} H${batteryHomeEndX + pvGridTurnRadius} A${pvGridTurnRadius} ${pvGridTurnRadius} 0 0 0 ${batteryHomeEndX} ${batteryHomeStartY + pvGridTurnRadius} V${homeNode.y}" />
+          <circle id="dot-pv-home"      r="4" fill="${pvColor}" opacity="0" />
+          <path id="arc-grid-battery" class="flow-line" fill="none"
+                d="M${gridNode.x} ${gridNode.y} H${humpStartX} Q${humpCtrlInX} ${humpPeakY} ${homeCenterX} ${humpPeakY} Q${humpCtrlOutX} ${humpPeakY} ${humpEndX} ${gridNode.y} H${batteryNode.x}" />
 
           <!-- Remaining flow dots -->
-          <circle id="dot-pv-grid"      r="5" fill="${pvColor}" opacity="0" />
-          <circle id="dot-pv-battery"   r="5" fill="${pvColor}" opacity="0" />
-          <circle id="dot-grid-home"    r="5" fill="${gridColor}" opacity="0" />
-          <circle id="dot-grid-battery" r="5" fill="${gridColor}" opacity="0" />
-          <circle id="dot-battery-home" r="5" fill="${batteryColor}" opacity="0" />
-          <circle id="dot-battery-grid" r="5" fill="${batteryColor}" opacity="0" />
+          <circle id="dot-pv-grid"      r="4" fill="${pvColor}" opacity="0" />
+          <circle id="dot-pv-battery"   r="4" fill="${pvColor}" opacity="0" />
+          <circle id="dot-grid-home"    r="4" fill="${gridColor}" opacity="0" />
+          <circle id="dot-grid-battery" r="4" fill="${gridColor}" opacity="0" />
+          <circle id="dot-battery-home" r="4" fill="${batteryColor}" opacity="0" />
+          <circle id="dot-battery-grid" r="4" fill="${batteryColor}" opacity="0" />
 
           </svg>
           <div class="overlay">
@@ -1802,7 +1891,7 @@ class CompactPowerCard extends (window.LitElement ||
               </div>`
             )}
             ${gridLabelItems.map(
-              (lbl) => html`<div class="overlay-item anchor-left" style="left:${lbl.xPct}%; top:${lbl.yPct}%;">
+              (lbl) => html`<div class="overlay-item anchor-left" style="left:${lbl.xPct}%; top:${lbl.yPx}px;">
                 <div class="aux-marker clickable" style="flex-direction: row; gap: 4px;" @click=${() => this._openMoreInfo(lbl.entity || null)}>
                   <ha-icon icon="${lbl.icon}" style="color:${lbl.color}; opacity:${lbl.opacity}; --mdc-icon-size: calc(16px * var(--cpc-scale, 1)); filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
                   <div class="aux-label" style="color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">${renderValue(lbl.val)}</div>
@@ -1811,7 +1900,7 @@ class CompactPowerCard extends (window.LitElement ||
             )}
             ${hasBattery
               ? batteryLabelItems.map(
-                  (lbl) => html`<div class="overlay-item anchor-right battery-label" style="margin-right: 10px; left:${lbl.xPct}%; top:${lbl.yPct}%;">
+                  (lbl) => html`<div class="overlay-item anchor-right battery-label" style="margin-right: 10px; left:${lbl.xPct}%; top:${lbl.yPx}px;">
                     <div class="aux-marker clickable" style="flex-direction: row; gap: 4px;" @click=${() => this._openMoreInfo(lbl.entity || null)}>
                       <div class="aux-label" style="color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">${renderValue(lbl.val)}</div>
                       <ha-icon icon="${lbl.icon}" style="color:${lbl.color}; opacity:${lbl.opacity}; --mdc-icon-size: calc(16px * var(--cpc-scale, 1)); filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
@@ -1825,7 +1914,7 @@ class CompactPowerCard extends (window.LitElement ||
                 <ha-icon icon="mdi:solar-panel" style="color:${pvColor}; opacity:1; filter:${!this._isLightTheme() && pvNumeric !== 0 ? `drop-shadow(0 0 10px ${pvColor})` : "none"};"></ha-icon>
               </div>
             </div>
-            <div class="overlay-item anchor-left" style="left:${(gridIconX/baseWidth)*100}%; top:${pctGridY(85)}%;">
+            <div class="overlay-item anchor-left" style="left:${(gridIconX/baseWidth)*100}%; top:${gridIconTop}px;">
               <div class="node-marker grid-marker left clickable" @click=${() => this._openMoreInfo(gridCfg.entity)}>
                 <ha-icon icon="mdi:transmission-tower" style="color:${gridColor}; opacity:1; filter:${!this._isLightTheme() && gridNumeric !== 0 ? `drop-shadow(0 0 10px ${gridColor})` : "none"};"></ha-icon>
                 <div class="node-label left" style="color:${gridColor}; opacity:${gridLabelHidden ? 0.35 : gridOpacity};">
@@ -1846,7 +1935,7 @@ class CompactPowerCard extends (window.LitElement ||
               </div>
             </div>
             ${hasBattery
-              ? html`<div class="overlay-item anchor-right battery-section" style="left:${(batteryIconX/baseWidth)*100}%; top:${pctGridY(85)}%;">
+              ? html`<div class="overlay-item anchor-right battery-section" style="left:${(batteryIconX/baseWidth)*100}%; top:${batteryIconTop}px;">
                   <div class="node-marker battery-marker right ${batteryDetails.length ? "" : "clickable"}" @click=${() => {
                     if (!batteryDetails.length) this._openMoreInfo(batteryCfg.entity);
                   }}>
@@ -1861,7 +1950,7 @@ class CompactPowerCard extends (window.LitElement ||
                 </div>`
               : ""}
             ${batteryDetails.length
-              ? html`<div class="overlay-item anchor-right-top" style="left:${batteryDetailsLeft}%; top:${batteryDetailsTop}%;">
+              ? html`<div class="overlay-item anchor-right-top" style="left:${batteryDetailsLeft}%; top:${batteryDetailsTopPx}px;">
                   <div class="battery-multi" style="margin-right: 6px; margin-top: 6px;">
                     ${batteryDetails.map(
                       (b) => html`<div

@@ -65,6 +65,7 @@ class CompactPowerCard extends (window.LitElement ||
     this._resizeObserver = null;
     this._hostWidth = null;
     this._hostHeight = null;
+    this._externalHeight = null;
   }
 
   set hass(hass) {
@@ -367,14 +368,21 @@ class CompactPowerCard extends (window.LitElement ||
   connectedCallback() {
     super.connectedCallback();
     if (!this._resizeObserver) {
-        this._resizeObserver = new ResizeObserver((entries) => {
-          const rect = entries?.[0]?.contentRect;
-          if (rect) {
-            this._hostWidth = rect.width;
-            this._hostHeight = rect.height;
+      this._resizeObserver = new ResizeObserver((entries) => {
+        const rect = entries?.[0]?.contentRect;
+        if (rect) {
+          const newW = rect.width;
+          const newH = rect.height;
+          this._hostWidth = newW;
+          if (this._externalHeight == null) {
+            this._externalHeight = newH;
+          } else {
+            const deltaH = Math.abs(newH - this._externalHeight);
+            if (deltaH > 4) this._externalHeight = newH;
           }
-          this._updateScale();
-        });
+        }
+        this._updateScale();
+      });
     }
     this._resizeObserver.observe(this);
     this._updateScale();
@@ -984,8 +992,8 @@ class CompactPowerCard extends (window.LitElement ||
     const designHeight = 184;
     const defaultWidth = 512;
     const defaultHeight = 184;
-    const baseWidth = Math.max(200, this._hostWidth || defaultWidth);
-    const baseHeight = Math.max(120, this._hostHeight || defaultHeight);
+    const baseWidth = Math.max(512, this._hostWidth || defaultWidth);
+    const baseHeight = Math.max(184, this._externalHeight || defaultHeight);
     const extraHeight = Math.max(0, baseHeight - designHeight);
     const anchorLeftX = 51.2;
     const anchorRightMargin = 51.2;
@@ -1313,8 +1321,8 @@ class CompactPowerCard extends (window.LitElement ||
     const defaultWidth = 512;
     const defaultHeight = 184;
     const hostRect = this.getBoundingClientRect ? this.getBoundingClientRect() : null;
-    const baseWidth = Math.max(200, hostRect?.width || defaultWidth);
-    const baseHeight = Math.max(120, hostRect?.height || defaultHeight);
+    const baseWidth = Math.max(512, this._hostWidth || hostRect?.width || defaultWidth);
+    const baseHeight = Math.max(184, this._externalHeight || defaultHeight);
     const extraHeight = Math.max(0, baseHeight - designHeight);
     const viewHeight = baseHeight;
     const anchorLeftX = 51.2;
@@ -1346,8 +1354,11 @@ class CompactPowerCard extends (window.LitElement ||
     const gridArcCtrlX = gridArcMidX;
     const gridArcY = syGridBatt(73.6);
     const gridArcCtrlY = gridArcY - 15.3; // hump rises 15.3px above midline
-    const gridIconX = gridLineStartX - 26; // offset from line start
-    const batteryIconX = gridLineEndX + 26; // offset from line end
+    const rawWidthScale = baseWidth / designWidth;
+    const widthScale = rawWidthScale > 1 ? 0.85 : rawWidthScale;
+    const iconOffset = 26 * widthScale;
+    const gridIconX = gridLineStartX - iconOffset; // offset from line start, scale with width
+    const batteryIconX = gridLineEndX + iconOffset; // offset from line end, scale with width
     const pctBaseY = (v) => ((sy(v)) / viewHeight) * 100; // PV: stay near top as view grows
     const pctGridY = (v) => ((syGridBatt(v)) / viewHeight) * 100;
     const pctGridFixed = (v) => (sy(v) / viewHeight) * 100; // keep label anchors stable when height grows
@@ -1530,9 +1541,8 @@ class CompactPowerCard extends (window.LitElement ||
     const homeRowYBase = 145; // base Y for aux row; actual Y will be adjusted via pctHomeY
     const maxDevices = Math.min(normalizedSources.length, 8);
     if (maxDevices > 0) {
-      const scale = baseWidth / designWidth;
       const rawOffsets = [50, 100, 150, 200];
-      const offsets = rawOffsets.map((d) => d * scale);
+      const offsets = rawOffsets; // keep original spacing regardless of width
       const pad = Math.max(16, baseWidth * 0.05);
       for (let i = 0; i < maxDevices; i++) {
         const isLeft = i % 2 === 0;

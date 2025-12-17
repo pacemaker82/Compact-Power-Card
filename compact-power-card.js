@@ -1649,14 +1649,14 @@ class CompactPowerCard extends (window.LitElement ||
     const homeX = homeCenterX;
     const homeRowYBase = 145; // base Y for aux row; actual Y will be adjusted via pctHomeY
     const maxDevices = Math.min(normalizedSources.length, 8);
-    const hostWidthActual = this._hostWidth || hostRect?.width || baseWidth;
-    const smallScreenSpacing = hostWidthActual < 420 ? 44 : 48; // IMPORTANT: dont delete this, its needed to support phone UI.
+
     //
     if (maxDevices > 0) {
       // Build outward from the home icon in viewBox coords; keep symmetric spacing and respect padding.
       const deviceWidth = baseWidth;
       const pad = Math.max(16, deviceWidth * 0.05);
-      const spacing = Math.max(smallScreenSpacing, (deviceWidth - pad * 2) / 10); // base spacing; spreads as width grows
+      const spacingBase = 56 * (deviceWidth / designWidth); // scale baseline with view width (44 at 512px)
+      const spacing = Math.max(spacingBase, (deviceWidth - pad * 2) / 10); // base spacing; spreads as width grows
 
       for (let i = 0; i < maxDevices; i++) {
         const ring = Math.floor(i / 2) + 1; // 1,1,2,2,3,3...

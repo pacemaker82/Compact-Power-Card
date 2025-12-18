@@ -2,7 +2,7 @@
 
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/total?label=Total%20Downloads) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/latest/total?label=Latest%20Version)
 
-<img width="907" height="641" alt="Screenshot 2025-12-17 at 07 33 54" src="https://github.com/user-attachments/assets/644c2fb3-163b-44b9-9705-cd5bb1a323d3" />
+<img width="837" height="643" alt="Screenshot 2025-12-18 at 10 38 43" src="https://github.com/user-attachments/assets/e67d3f04-ac80-4506-ac43-fedd19e6dac2" />
 
 Inspired by the excellent [power flow card plus](https://github.com/flixlix/power-flow-card-plus) - A compact power card for Home Assistant that supports a tighter user experience, and 8 power devices/feeds from the home in a single card. In addition, the card can show 6 entity labels for whatever you want, colour and configure them how you need.
 
@@ -28,29 +28,30 @@ Custom Power Card should be available in the HACS store by default, simply searc
 
 ## Getting Started
 
-Before you dive in getting a complicated card all setup, start with the basics. In the card setup below, you have 3 power devices, grid, PV and battery. In this case, the home entity isn't provided, so the card will take care of the calculation itself:
+Before you dive in getting a complicated card all setup, start with the basics. In the card setup below, you have 3 power devices, grid, PV and battery. In this case, the home entity isn't provided, so the card will take care of the calculation itself. Also, please note how the battery section is slightly different due to the nature of supporting multiple battery setups:
 
 ```yaml
 type: custom:compact-power-card
+curved_lines: true
+curve_factor: 1
 entities:
   pv:
     entity: sensor.givtcp_pv_power
-    decimal_places: 2
   grid:
     entity: sensor.givtcp_grid_power
-    decimal_places: 2
   battery:
-    entity: sensor.givtcp_battery_power
-    decimal_places: 2
+    - entity: sensor.givtcp_battery_power
 ```
 
 ## Managing the size of the card
 
-This card is designed for the new [Home Assistant Sections UI](https://www.home-assistant.io/dashboards/sections/), introduced in 2014. This allows you to scale the card horizontally or vertically as you see fit. The card will dynamically resize to fit the rows and columns you setup in the card UI:
+This card is designed for the new [Home Assistant Sections UI](https://www.home-assistant.io/dashboards/sections/), introduced in 2024. This allows you to scale the card horizontally or vertically as you see fit. The card will dynamically resize to fit the rows and columns you setup in the card UI:
 
-<img width="1003" height="750" alt="Screenshot 2025-12-15 at 16 05 36" src="https://github.com/user-attachments/assets/f176dea8-f834-4ece-a12e-358fc5661700" />
+<img width="1000" height="741" alt="Screenshot 2025-12-18 at 10 41 00" src="https://github.com/user-attachments/assets/e0a1a5e2-8567-4c69-ad4e-c4cb7b0ec984" />
 
 # Compact Power Card Settings (Quick Reference)
+
+**Note:** All of these settings are available in the configuration UI, details here for reference.
 
 ## Card-level
 
@@ -62,23 +63,20 @@ This card is designed for the new [Home Assistant Sections UI](https://www.home-
 | Power Unit Override | `power_unit`| Set to W, kW or mW |
 | Show curved lines? | `curved_lines`| Set to `false` if you want a more straight-edge look. Default `true` |
 | Curved Line Radius | `curve_factor`| Adjusts the curve radius. `1` to `5`, `1` is default. Only works when `curved_lines: true` |
+| Device Power Lines | `show_device_power_lines`| Set to `true` to light up devices when power is flowing beyond a threshold. Default `false` |
 
 ### Thresholds in detail
 
-In display_only mode:
+The following rules are always true:
 
 - Thresholds determine the opacity of the icon and labels (faded when below threshold)
-- Thresholds determine the animation of power flow lines (off when below threshold)
-- If home entity isn't provided: Home calculation is based on the raw values from PV, Grid, Battery and devices (only subtract if `subtract_devices_from_home: true`).
-- If home entity is provided: Home calculation is based on the home entity state (only subtract if `subtract_devices_from_home: true`).
+- Thresholds determine the animation and appearance of power flow lines (off when below threshold)
 
-In calculation mode:
+However, in `calculations` mode (default):
 
-- Thresholds determine the opacity of the icon and labels (faded when below threshold)-
-- Thresholds determine the animation of power flow lines (off when below threshold)
-- If threshold isn't met, then the raw value is 0
-- If home entity isn't provided: Home calculation is based on the raw values from PV, Grid, Battery and devices (only subtract if `subtract_devices_from_home: true`).
-- If home entity is provided: Home calculation is based on the home entity state (only subtract if `subtract_devices_from_home: true`).
+- If threshold isn't met, then the raw power value of the entity is set to 0. This means that the entity essentially will not be part of any power calculations if the threshold isn't met. 
+
+If you always want the power calculations to use the raw entity values, set `threshold_mode: display_only`
 
 Example:
 ```yaml
@@ -108,7 +106,7 @@ Common keys for `pv`, `grid`, `home`, `battery`. The following settings are poss
 | Show SoC            | `show_soc`              | If true, appends `| {soc}%` to the battery power label when a SoC source is configured. Default: false. |
 | Capacity          | `battery_capacity`              | Set the capacity of the battery in kWh, e.g. `9.5` |
 
-Example of a basic setup:
+Example of a basic setup, note how battery is slightly different YAML as the card supports multiple batteries:
 
 ```yaml
 entities:
@@ -121,9 +119,9 @@ entities:
   home:
     entity: sensor.home_power
   battery:
-    entity: sensor.battery_power
-    battery_soc: sensor.battery_soc
-    show_soc: true
+    - entity: sensor.givtcp_battery_power
+      battery_soc: sensor.battery_soc
+      show_soc: true
 ```
 
 The card supports many combinations: PV/Grid/Home/Battery, PV/Grid/Home, Battery/Grid/Home, Grid/Home
@@ -189,7 +187,7 @@ Labels can be used to display "other" information - that can be more power stats
 
 | Name          | Setting slug                 | What it does                                                         |
 | ------------- | ---------------------------- | -------------------------------------------------------------------- |
-| Labels list   | `labels`                     | Array (max 2 for each) of label objects.                                     |
+| Labels list   | `labels`                     | Array (max 2 for each) of label objects (supported in grid/pv).                                     |
 | Label entity  | `entity`            | Sensor/entity id for the label value.                                |
 | Label attribute | `attribute`       | Read from an attribute instead of state.                             |
 | Icon    | `icon`              | Optional icon shown next to the label.                               |
@@ -214,7 +212,7 @@ Example of a label setup:
 
 **IMPORTANT**
 
-If you setup multiple batteries, the 2x battery labels must be setup like this:
+Battery labels are setup differently (due to the nature of supporting multi-battery setups):
 
 ```yaml
   battery:
@@ -236,7 +234,7 @@ If you setup multiple batteries, the 2x battery labels must be setup like this:
 
 ## Card Configuration Example:
 
-The following example shows a mixed configuration of power devices, labels and additional power. 
+The following example shows a mixed configuration of power devices, labels and additional power so you can get the idea. 
 
 ```yaml
 type: custom:compact-power-card
@@ -264,12 +262,12 @@ entities:
     entity: sensor.home_power
     decimal_places: 1
   battery:
-    entity: sensor.battery_power
-    invert_state_values: false
-    threshold: 25
-    labels:
-      - entity: sensor.battery_soc
-        unit: "%"
+    - entity: sensor.battery_power
+      invert_state_values: false
+      threshold: 25
+  battery_labels:
+    - entity: sensor.battery_soc
+      unit: "%"
   devices:
     - entity: sensor.ev_charger_power
       icon: mdi:car-electric

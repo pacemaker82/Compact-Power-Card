@@ -15,21 +15,369 @@ class CompactPowerCard extends (window.LitElement ||
 
   static getConfigForm() {
     return {
-      schema: [
+      schema: [ 
         {
-          name: "help_text",
-          type: "constant",
-          value: "",
-        },
+          name: "",
+          type: "grid",
+          schema: [
+            {
+                name: "threshold_mode",
+                selector: { 
+                  select: { 
+                    mode: "dropdown",
+                    options: 
+                      ["calculations", 
+                      "display_only"],              
+                  },
+                },
+              },
+              {
+                name: "decimal_places",
+                selector: { number: {} },
+              },                
+              {
+                name: "subtract_devices_from_home",
+                selector: { boolean: {} },
+              },  
+              {
+                name: "power_unit",
+                selector: { 
+                  select: { 
+                    mode: "dropdown",
+                    options: ["W", "kW", "mW"],              
+                  },
+                },
+              },        
+              {
+                name: "curved_lines",
+                selector: { boolean: {} },
+              },          
+              {
+                name: "curve_factor",
+                selector: { number: { min: 1, max: 5, step: 0.5, mode: "slider" } },
+              }, 
+              {
+                name: "enable_device_power_lines",
+                selector: { boolean: { } },
+              },              
+          ]
+        },       
+        {
+          name: "entities",
+          title: "Power Entities & Labels",
+          type: "expandable",
+          flatten: false,
+          schema: [
+              { name: "grid", 
+                title: "Grid",
+                type: "expandable",
+                flatten: false,
+                schema: [
+                  { name: "entity", title: "Grid Entity", selector: { entity: {} } },   
+                  { name: "",
+                    type: "grid",
+                    schema: [
+                      {
+                        name: "threshold",
+                        selector: { number: {} },
+                      },                     
+                      { name: "decimal_places", selector: { number: {} } },
+                      { name: "color", selector: {text: {} } },
+                      {
+                        name: "unit",
+                        selector: { 
+                          select: { 
+                            mode: "dropdown",
+                            options: ["W", "kW", "mW"],              
+                          },
+                        },
+                      },                                         
+                    ]
+                  },
+                  { name: "invert_state_values", selector: { boolean: {} } },                              
+                  { name: "labels",
+                    selector: {
+                      object: {
+                        multiple: true,
+                        label_field: "entity",
+                        fields: {
+                          entity: { 
+                            label: "Label Entity",
+                            selector: { entity: {} },
+                          },
+                          attribute: { 
+                            label: "Entity Attribute",
+                            selector: { text: {} },
+                          },                          
+                          icon: { 
+                            label: "Icon",
+                            selector: { icon: {} },
+                          },                           
+                          decimal_places: { 
+                            label: "Decimal Places",
+                            selector: { number: {} },
+                          },
+                          unit: { 
+                            label: "Unit of Measurement",
+                            selector: { text: {}},
+                          },      
+                          color: { 
+                            label: "Colour",
+                            selector: { text: {} },
+                          },    
+                          threshold: { 
+                            label: "Threshold",
+                            selector: { number: {} },
+                          },                                                                                                           
+                        },
+                      },
+                    },
+                  },                                          
+                ]
+              },
+              { name: "pv", 
+                title: "PV",
+                type: "expandable",
+                flatten: false,
+                schema: [
+                  { name: "entity", selector: { entity: {} } },   
+                  { name: "",
+                    type: "grid",
+                    schema: [
+                      {
+                        name: "threshold",
+                        selector: { number: {} },
+                      },                      
+                      { name: "decimal_places", selector: { number: {} } },
+                      { name: "color", selector: {text: {} } },
+                      {
+                        name: "unit",
+                        selector: { 
+                          select: { 
+                            mode: "dropdown",
+                            options: ["W", "kW", "mW"],              
+                          },
+                        },
+                      },                                         
+                    ]
+                  },
+                  { name: "invert_state_values", selector: { boolean: {} } },                              
+                  { name: "labels",
+                    selector: {
+                      object: {
+                        multiple: true,
+                        label_field: "entity",
+                        fields: {
+                          entity: { 
+                            label: "Label Entity",
+                            selector: { entity: {} },
+                          },
+                          attribute: { 
+                            label: "Entity Attribute",
+                            selector: { text: {} },
+                          },                          
+                          icon: { 
+                            label: "Icon",
+                            selector: { icon: {} },
+                          },                           
+                          decimal_places: { 
+                            label: "Decimal Places",
+                            selector: { number: {} },
+                          },
+                          unit: { 
+                            label: "Unit of Measurement",
+                            selector: { text: {}},
+                          },      
+                          color: { 
+                            label: "Colour",
+                            selector: { text: {} },
+                          },    
+                          threshold: { 
+                            label: "Threshold",
+                            selector: { number: {} },
+                          },                                                                                                           
+                        },
+                      },
+                    },
+                  },                                            
+                ]
+              },  
+              { name: "battery",
+                selector: {
+                  object: {
+                    multiple: true,
+                    label_field: "entity",
+                    fields: {
+                      entity: { 
+                        label: "Battery Entity",
+                        selector: { entity: {} },
+                      },  
+                      battery_soc: { 
+                        label: "Battery SoC Entity",
+                        selector: { entity: {} },
+                      },  
+                      battery_capacity: { 
+                        label: "Battery Capacity (kWh)",
+                        selector: { number: { step: 0.1 } },
+                      },                      
+                      show_soc: {
+                        label: "Show SoC Label?",
+                        selector: { boolean: {} } 
+                      },                                           
+                      invert_state_values: {
+                        label: "Invert State Values?",
+                        selector: { boolean: {} } 
+                      },
+                      decimal_places: { 
+                        label: "Decimal Places",
+                        selector: { number: {} },
+                      },
+                      unit: { 
+                        label: "Unit of Measurement",
+                        selector: { 
+                          select: { 
+                            mode: "dropdown",
+                            options: ["W", "kW", "mW"],              
+                          },
+                        },
+                      },     
+                      color: { 
+                        label: "Colour",
+                        selector: { text: {} },
+                      },    
+                      threshold: { 
+                        label: "Threshold",
+                        selector: { number: {} },
+                      },                                                                                                           
+                    },
+                  },
+                },
+              },
+              { name: "battery_labels",
+                selector: {
+                  object: {
+                    multiple: true,
+                    label_field: "entity",
+                    fields: {
+                      entity: { 
+                        label: "Label Entity",
+                        selector: { entity: {} },
+                      },
+                      attribute: { 
+                        label: "Entity Attribute",
+                        selector: { text: {} },
+                      },                          
+                      icon: { 
+                        label: "Icon",
+                        selector: { icon: {} },
+                      },                           
+                      decimal_places: { 
+                        label: "Decimal Places",
+                        selector: { number: {} },
+                      },
+                      unit: { 
+                        label: "Unit of Measurement",
+                        selector: { text: {}},
+                      },     
+                      color: { 
+                        label: "Colour",
+                        selector: { text: {} },
+                      },    
+                      threshold: { 
+                        label: "Threshold",
+                        selector: { number: {} },
+                      },                                                                                                           
+                    },
+                  },
+                },
+              },                
+              { name: "home", 
+                title: "Home",
+                type: "expandable",
+                flatten: false,
+                schema: [
+                  { name: "entity", selector: { entity: {} } },
+                  { name: "",
+                    type: "grid",
+                    schema: [
+                      {
+                        name: "threshold_mode",
+                        selector: { 
+                          select: { 
+                            mode: "dropdown",
+                            options: 
+                              ["calculations", 
+                              "display_only"],              
+                          },
+                        },
+                      },                      
+                      { name: "decimal_places", selector: { number: {} } },
+                      { name: "color", selector: {text: {} } },
+                      {
+                        name: "unit",
+                        selector: { 
+                          select: { 
+                            mode: "dropdown",
+                            options: ["W", "kW", "mW"],              
+                          },
+                        },
+                      },                                         
+                    ]
+                  },
+                  { name: "invert_state_values", selector: { boolean: {} } },                                      
+                ]
+              },   
+              { name: "devices",
+                selector: {
+                  object: {
+                    multiple: true,
+                    label_field: "entity",
+                    fields: {
+                      entity: { 
+                        label: "Label Entity",
+                        selector: { entity: {} },
+                      },
+                      attribute: { 
+                        label: "Entity Attribute",
+                        selector: { text: {} },
+                      },                          
+                      icon: { 
+                        label: "Icon",
+                        selector: { icon: {} },
+                      },                           
+                      decimal_places: { 
+                        label: "Decimal Places",
+                        selector: { number: {} },
+                      },
+                      unit: { 
+                        label: "Unit of Measurement",
+                        selector: { text: {} },
+                      },     
+                      color: { 
+                        label: "Colour",
+                        selector: { text: {} },
+                      },    
+                      threshold: { 
+                        label: "Threshold",
+                        selector: { number: {} },
+                      },                                                                                                           
+                    },
+                  },
+                },
+              },                                                                  
+          ]
+        },               
       ],
       computeLabel: (schema) => {
-        if (schema.name === "help_text") return "Settings Coming Soon";                
+        if (schema.name === "help_text") return "Settings Coming Soon";
+        if (schema.name === "curved_lines") return "Use Curved Lines?";
+        if (schema.name === "battery") return "Batteries";
         return undefined;
       },
       computeHelper: (schema) => {
         switch (schema.name) {
           case "help_text":
-            return "some helpful text";          
+            return "some helpful text";             
         }
         return undefined;
       },
@@ -48,10 +396,12 @@ class CompactPowerCard extends (window.LitElement ||
   static getStubConfig() {
     return {
       type: "custom:compact-power-card",
+      curved_lines: true,
+      curve_factor: 1,
       entities: {
-        pv: { entity: "sensor.givtcp_pv_power", decimal_places: 2 },
-        grid: { entity: "sensor.givtcp_grid_power", decimal_places: 2 },
-        battery: { entity: "sensor.givtcp_battery_power", decimal_places: 2 },
+        pv: { entity: "sensor.givtcp_pv_power" },
+        grid: { entity: "sensor.givtcp_grid_power" },
+        battery: [ {entity: "sensor.givtcp_battery_power" }],
       },
     };
   }
@@ -66,11 +416,16 @@ class CompactPowerCard extends (window.LitElement ||
     this._hostWidth = null;
     this._hostHeight = null;
     this._externalHeight = null;
+    this._deviceLines = [];
+    this._trackedEntityIds = new Set();
+    this._lastEntityStates = new Map();
+    this._lastThemeMode = null;
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._config) {
+    if (!this._config) return;
+    if (this._shouldUpdateForHass(hass)) {
       this._updateFlows();
       this.requestUpdate();
     }
@@ -91,6 +446,9 @@ class CompactPowerCard extends (window.LitElement ||
       );
     }
     this._config = config;
+    this._trackedEntityIds = this._collectEntityIds();
+    this._lastEntityStates.clear();
+    this._lastThemeMode = null;
   }
 
   static get styles() {
@@ -129,6 +487,13 @@ class CompactPowerCard extends (window.LitElement ||
         stroke: #7a7a7a;
         stroke-opacity: 0.15;
         transition: stroke 0.3s ease, stroke-opacity 0.3s ease;
+        vector-effect: non-scaling-stroke;
+      }
+
+      .device-line {
+        fill: none;
+        stroke-linecap: round;
+        stroke-width: 3;
         vector-effect: non-scaling-stroke;
       }
 
@@ -233,9 +598,37 @@ class CompactPowerCard extends (window.LitElement ||
       }
 
       .home-label {
-        font-size: calc(16px * var(--cpc-scale, 1));
+        font-size: calc(16px * var(--cpc-scale, 0.8));
         font-weight: 700;
-        margin-top: -10px;
+        margin-top: calc(-16px * var(--cpc-scale, 0.8));
+      }
+
+      .device-power-dot {
+        width: calc(8px * var(--cpc-scale, 1));
+        height: calc(8px * var(--cpc-scale, 1));
+        border-radius: 999px;
+        background: currentColor;
+        opacity: 1;
+      }
+
+      .device-power-dot.active {
+        animation: cpc-pulse 1.4s ease-in-out infinite;
+      }
+
+      .device-power-dot-wrapper {
+        pointer-events: none;
+      }
+
+      @keyframes cpc-pulse {
+        0% {
+          transform: scale(0.85);
+        }
+        50% {
+          transform: scale(1.15);
+        }
+        100% {
+          transform: scale(0.85);
+        }
       }
 
       .battery-multi {
@@ -363,6 +756,48 @@ class CompactPowerCard extends (window.LitElement ||
   updated(changedProps) {
     if (super.updated) super.updated(changedProps);
     this._adjustLayout();
+    this._renderDeviceLines();
+  }
+
+  _renderDeviceLines() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const group = root.getElementById("device-lines");
+    if (!group) return;
+    group.innerHTML = "";
+    if (!this._useDevicePowerLines()) return;
+    const lines = Array.isArray(this._deviceLines) ? this._deviceLines : [];
+    if (!lines.length) return;
+    const ns = "http://www.w3.org/2000/svg";
+    for (const ln of lines) {
+      const path = document.createElementNS(ns, "path");
+      const horizDist = Math.abs(ln.homeX - ln.startX);
+      const vertDist = Math.abs(ln.downY - ln.upY);
+      const cornerRadius = Math.min(4, horizDist / 2, vertDist);
+      const dir = ln.homeX >= ln.startX ? 1 : -1;
+      const useCurve = cornerRadius > 0 && horizDist > 0;
+      const d = useCurve
+        ? `M${ln.startX} ${ln.startY} V${ln.downY - cornerRadius} ` +
+          `Q${ln.startX} ${ln.downY} ${ln.startX + dir * cornerRadius} ${ln.downY} ` +
+          `H${ln.homeX}`
+        : `M${ln.startX} ${ln.startY} V${ln.downY} H${ln.homeX}`;
+      path.setAttribute(
+        "d",
+        d
+      );
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", ln.color);
+      path.setAttribute("stroke-opacity", String(ln.opacity ?? 1));
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      if (ln.dashed) {
+        path.setAttribute("stroke-dasharray", "2 4");
+      } else if (!this._isLightTheme()) {
+        path.style.filter = `drop-shadow(0 0 6px ${ln.color})`;
+      }
+      group.appendChild(path);
+    }
   }
 
   connectedCallback() {
@@ -373,6 +808,8 @@ class CompactPowerCard extends (window.LitElement ||
         if (rect) {
           const newW = rect.width;
           const newH = rect.height;
+          const prevW = this._hostWidth;
+          const prevH = this._hostHeight;
           this._hostWidth = newW;
           this._hostHeight = newH;
           if (this._externalHeight == null) {
@@ -381,6 +818,9 @@ class CompactPowerCard extends (window.LitElement ||
             const grow = newH > this._externalHeight + 2;
             const shrink = newH < this._externalHeight - 24; // allow only meaningful external shrink
             if (grow || shrink) this._externalHeight = newH;
+          }
+          if (prevW == null || prevH == null) {
+            this.requestUpdate();
           }
         }
         this._updateScale();
@@ -512,8 +952,110 @@ class CompactPowerCard extends (window.LitElement ||
     return Boolean(val);
   }
 
+  _extractEntityRef(val) {
+    if (!val) return null;
+    if (typeof val === "string") return val;
+    if (typeof val === "object") {
+      return (
+        val.entity ||
+        val.entity_id ||
+        val.id ||
+        val.name ||
+        val.source ||
+        val.src ||
+        null
+      );
+    }
+    return null;
+  }
+
+  _collectEntityIds() {
+    const ids = new Set();
+    const ents = this._config?.entities || {};
+    const add = (id) => {
+      if (id) ids.add(id);
+    };
+    const addEntityConfig = (cfg) => {
+      if (!cfg) return;
+      if (Array.isArray(cfg)) {
+        cfg.forEach(addEntityConfig);
+        return;
+      }
+      add(this._extractEntityRef(cfg));
+    };
+
+    addEntityConfig(ents.pv);
+    addEntityConfig(ents.grid);
+    addEntityConfig(ents.home);
+    addEntityConfig(ents.battery);
+
+    const pvLabels = this._normalizeLabels(ents.pv?.labels);
+    const gridLabels = this._normalizeLabels(ents.grid?.labels);
+    const batteryLabelsSource = Array.isArray(ents.battery)
+      ? ents.battery_labels || ents.battery?.labels
+      : ents.battery?.labels;
+    const batteryLabels = this._normalizeLabels(batteryLabelsSource);
+
+    pvLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
+    gridLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
+    batteryLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
+
+    const batteryList = Array.isArray(ents.battery)
+      ? ents.battery
+      : ents.battery
+      ? [ents.battery]
+      : [];
+    for (const cfg of batteryList) {
+      const socRef =
+        this._extractEntityRef(cfg?.battery_soc) ||
+        this._extractEntityRef(cfg?.soc) ||
+        this._extractEntityRef(cfg?.soc_entity) ||
+        this._extractEntityRef(cfg?.battery_soc_entity) ||
+        this._extractEntityRef(cfg?.battery_soc_id) ||
+        this._extractEntityRef(cfg?.soc_entity_id);
+      add(socRef);
+    }
+
+    const { sources } = this._getSourcesConfig();
+    sources.forEach((src) => add(this._extractEntityRef(src?.entity)));
+
+    return ids;
+  }
+
+  _shouldUpdateForHass(hass) {
+    const themeMode = hass?.themes?.darkMode ?? null;
+    if (themeMode !== this._lastThemeMode) {
+      this._lastThemeMode = themeMode;
+      return true;
+    }
+
+    const ids = this._trackedEntityIds || new Set();
+    if (!ids.size) return true;
+
+    let changed = false;
+    for (const id of ids) {
+      const st = hass?.states?.[id];
+      const stamp = st ? `${st.last_changed}|${st.last_updated}` : "missing";
+      const prev = this._lastEntityStates.get(id);
+      if (prev !== stamp) {
+        this._lastEntityStates.set(id, stamp);
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+
+    for (const id of Array.from(this._lastEntityStates.keys())) {
+      if (!ids.has(id)) this._lastEntityStates.delete(id);
+    }
+    return true;
+  }
+
   _useCurvedLines() {
     return this._coerceBoolean(this._config?.curved_lines, true);
+  }
+
+  _useDevicePowerLines() {
+    return this._coerceBoolean(this._config?.enable_device_power_lines, false);
   }
 
   _getSourcesConfig() {
@@ -825,7 +1367,7 @@ class CompactPowerCard extends (window.LitElement ||
 
   _updateFlows() {
     if (!this._config || !this.hass || !this.shadowRoot) return;
-
+    
     const pvCfg = this._getEntityConfig("pv");
     const gridCfg = this._getEntityConfig("grid");
     const homeCfg = this._getEntityConfig("home");
@@ -1407,6 +1949,7 @@ class CompactPowerCard extends (window.LitElement ||
       : batteryCfg?.labels;
     const batteryLabels = this._normalizeLabels(batteryLabelsSource);
     const { sources: normalizedSources } = this._getSourcesConfig();
+    const enableDevicePowerLines = this._useDevicePowerLines();
     const designWidth = 512;
     const designHeight = 184;
     const defaultWidth = 512;
@@ -1701,6 +2244,35 @@ class CompactPowerCard extends (window.LitElement ||
         numeric: numericW,
       };
     });
+    const hasDeviceSources = normalizedSources.length > 0;
+    const deviceUsageWatts = sources.reduce((total, src) => {
+      const val = src?.hidden ? 0 : Math.max(src?.numeric ?? 0, 0);
+      return total + val;
+    }, 0);
+    const deviceUsageActive = deviceUsageWatts > 0;
+    const pulseMinSeconds = 0.6;
+    const pulseMaxSeconds = 2.2;
+    const pulseMaxWatts = 5000;
+    const pulseT = Math.min(deviceUsageWatts, pulseMaxWatts) / pulseMaxWatts;
+    const devicePulseSeconds = pulseMaxSeconds - (pulseMaxSeconds - pulseMinSeconds) * pulseT;
+    const deviceJunctionTopPct = pctHomeY(homeRowYBase + 26);
+    let deviceLines = [];
+    if (enableDevicePowerLines) {
+      deviceLines = sourcePositions.map((pos, idx) => {
+        const src = sources[idx];
+        if (!src) return null;
+        const numeric = src.numeric ?? 0;
+        const startX = pos.x;
+        const startY = syHome(homeRowYBase + 22); // start just below label, anchored to bottom
+        const downY = startY + 8;
+        const upY = startY + 4;
+        const color = homeColor;
+        const dashed = numeric <= 0 || src.hidden;
+        const opacity = dashed ? 0.1 : 1;
+        return { color, opacity, idx, startX, startY, downY, upY, homeX: homeNode.x, dashed };
+      }).filter(Boolean);
+    }
+    this._deviceLines = deviceLines;
 
     // Sync host classes for hiding sections
     this.classList.toggle("no-pv", !hasPv);
@@ -1928,6 +2500,7 @@ class CompactPowerCard extends (window.LitElement ||
           <path id="line-home-battery" class="flow-line" fill="none" d="${batteryHomePath}" />
           <circle id="dot-pv-home"      r="4" fill="${pvColor}" opacity="0" />
           <path id="arc-grid-battery" class="flow-line" fill="none" d="${gridBatteryPath}" />
+          <g id="device-lines"></g>
 
           <!-- Remaining flow dots -->
           <circle id="dot-pv-grid"      r="4" fill="${pvColor}" opacity="0" />
@@ -1976,7 +2549,7 @@ class CompactPowerCard extends (window.LitElement ||
               <div class="node-marker grid-marker left clickable" @click=${() => this._openMoreInfo(gridCfg.entity)}>
                 <ha-icon icon="mdi:transmission-tower" style="color:${gridColor}; opacity:1; filter:${!this._isLightTheme() && gridNumeric !== 0 ? `drop-shadow(0 0 10px ${gridColor})` : "none"};"></ha-icon>
                 <div class="node-label left" style="color:${gridColor}; opacity:${gridLabelHidden ? 0.35 : gridOpacity};">
-                  ${gridArrow
+                  ${gridArrow && !gridLabelHidden
                     ? html`<ha-icon class="inline-icon" icon="${gridArrow}" style="color:${gridColor}; opacity:${gridOpacity};"></ha-icon>`
                     : ""}
                   <span style="opacity:${gridOpacity};">${renderValue(gridVal)}</span>
@@ -1992,6 +2565,11 @@ class CompactPowerCard extends (window.LitElement ||
                 <div class="home-label" style="color:${homeColor}; opacity:${homeLabelHidden ? 0.35 : homeOpacity};">${renderValue(homeVal)}</div>
               </div>
             </div>
+            ${enableDevicePowerLines && hasDeviceSources
+              ? html`<div class="overlay-item device-power-dot-wrapper" style="left:${(homeCenterX/baseWidth)*100}%; top: calc(${deviceJunctionTopPct}% + 4px);">
+                  <div class="device-power-dot ${deviceUsageActive ? "active" : ""}" style="color:${homeColor};${deviceUsageActive ? `animation-duration:${devicePulseSeconds.toFixed(2)}s;` : ""}"></div>
+                </div>`
+              : ""}
             ${hasBattery
               ? html`<div class="overlay-item anchor-right battery-section" style="left:${(batteryIconX/baseWidth)*100}%; top:${batteryIconTop}px;">
                   <div class="node-marker battery-marker right ${batteryDetails.length ? "" : "clickable"}" @click=${() => {
@@ -1999,7 +2577,7 @@ class CompactPowerCard extends (window.LitElement ||
                   }}>
                     <ha-icon icon="${batteryIcon}" style="color:${batteryColor}; opacity:${batteryIconOpacity}; filter:${!this._isLightTheme() && battNumericW !== 0 ? `drop-shadow(0 0 10px ${batteryColor})` : "none"};"></ha-icon>
                     <div class="node-label right" style="color:${batteryColor}; opacity:${batteryLabelHidden ? 0.35 : batteryLabelOpacity};">
-                      ${battArrow
+                      ${battArrow && !batteryLabelHidden
                         ? html`<ha-icon class="inline-icon" icon="${battArrow}" style="color:${batteryColor}; opacity:1;"></ha-icon>`
                         : ""}
                       <span style="opacity:1;">${renderValue(battValDisplay)}</span>
@@ -2017,7 +2595,7 @@ class CompactPowerCard extends (window.LitElement ||
                         @click=${() => this._openMoreInfo(b.entity)}
                       >
                         <div class="aux-label" style="padding-top: 0px; padding-bottom: 0px; margin-top: 4px; padding-left: 1px; padding-right: 1px; opacity:${b.hidden ? 0.35 : b.opacity};">
-                          ${b.arrow
+                          ${b.arrow && !b.hidden
                             ? html`<ha-icon class="inline-icon" icon="${b.arrow}" style="color:${b.color}; opacity:1; --mdc-icon-size: calc(12px * var(--cpc-scale, 1));"></ha-icon>`
                             : ""}
                           ${b.valNode || renderValue(b.val)}
@@ -2057,8 +2635,9 @@ if (window?.customCards) {
     window.customCards.push({
       type: "compact-power-card",
       name: "Compact Power Card",
+      preview: true,
       description: "Compact power flow card with PV, grid, battery, and home flows.",
-      preview: false,
+      documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
     });
   }
 } else if (window) {
@@ -2066,8 +2645,9 @@ if (window?.customCards) {
     {
       type: "compact-power-card",
       name: "Compact Power Card",
+      preview: true,
       description: "Compact power flow card with PV, grid, battery, and home flows.",
-      preview: false,
+      documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
     },
   ];
 }

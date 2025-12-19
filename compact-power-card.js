@@ -73,15 +73,15 @@ class CompactPowerCard extends (window.LitElement ||
                 type: "expandable",
                 flatten: false,
                 schema: [
-                  { name: "entity", title: "Grid Entity", selector: { entity: {} } },   
+                  { name: "entity", id: "grid-entity", selector: { entity: {} } },   
                   { name: "",
                     type: "grid",
                     schema: [
                       {
-                        name: "threshold",
+                        name: "threshold", id: "power-threshold", title: "Power Threshold (in watts)",
                         selector: { number: {} },
                       },                     
-                      { name: "decimal_places", selector: { number: {} } },
+                      { name: "decimal_places", title: "Decimal Places", selector: { number: {} } },
                       { name: "color", selector: {text: {} } },
                       {
                         name: "unit",
@@ -140,12 +140,12 @@ class CompactPowerCard extends (window.LitElement ||
                 type: "expandable",
                 flatten: false,
                 schema: [
-                  { name: "entity", selector: { entity: {} } },   
+                  { name: "entity", id: "pv-entity", selector: { entity: {} } },   
                   { name: "",
                     type: "grid",
                     schema: [
                       {
-                        name: "threshold",
+                        name: "threshold", id: "power-threshold", 
                         selector: { number: {} },
                       },                      
                       { name: "decimal_places", selector: { number: {} } },
@@ -209,7 +209,7 @@ class CompactPowerCard extends (window.LitElement ||
                     label_field: "entity",
                     fields: {
                       entity: { 
-                        label: "Battery Entity",
+                        label: "Battery Power Entity",
                         selector: { entity: {} },
                       },  
                       battery_soc: { 
@@ -246,7 +246,7 @@ class CompactPowerCard extends (window.LitElement ||
                         selector: { text: {} },
                       },    
                       threshold: { 
-                        label: "Threshold",
+                        label: "Power Threshold (in watts)",
                         selector: { number: {} },
                       },                                                                                                           
                     },
@@ -296,20 +296,12 @@ class CompactPowerCard extends (window.LitElement ||
                 type: "expandable",
                 flatten: false,
                 schema: [
-                  { name: "entity", selector: { entity: {} } },
+                  { name: "entity", id: "home-entity", selector: { entity: {} } },
                   { name: "",
                     type: "grid",
                     schema: [
                       {
-                        name: "threshold_mode",
-                        selector: { 
-                          select: { 
-                            mode: "dropdown",
-                            options: 
-                              ["calculations", 
-                              "display_only"],              
-                          },
-                        },
+                        name: "threshold", id: "power-threshold", selector: { number: {} }
                       },                      
                       { name: "decimal_places", selector: { number: {} } },
                       { name: "color", selector: {text: {} } },
@@ -334,7 +326,7 @@ class CompactPowerCard extends (window.LitElement ||
                     label_field: "entity",
                     fields: {
                       entity: { 
-                        label: "Label Entity",
+                        label: "Device Power Entity",
                         selector: { entity: {} },
                       },
                       attribute: { 
@@ -358,7 +350,7 @@ class CompactPowerCard extends (window.LitElement ||
                         selector: { text: {} },
                       },    
                       threshold: { 
-                        label: "Threshold",
+                        label: "Power Threshold (in watts)",
                         selector: { number: {} },
                       },                                                                                                           
                     },
@@ -372,6 +364,12 @@ class CompactPowerCard extends (window.LitElement ||
         if (schema.name === "help_text") return "Settings Coming Soon";
         if (schema.name === "curved_lines") return "Use Curved Lines?";
         if (schema.name === "battery") return "Batteries";
+        if (schema.id === "grid-entity") return "Grid Power Entity";
+        if (schema.id === "power-threshold") return "Power Threshold (in watts)";
+        if (schema.id === "label-entity") return "Entity for the label";
+        if (schema.id === "device-entity") return "Device Power Entity";
+        if (schema.id === "pv-entity") return "PV Power Entity";
+        if (schema.id === "home-entity") return "Home Power Entity";
         return undefined;
       },
       computeHelper: (schema) => {
@@ -892,7 +890,7 @@ class CompactPowerCard extends (window.LitElement ||
     return { entity: null };
   }
 
-  _normalizeLabels(labels) {
+  _normalizeLabels(labels, max = 2) {
     if (!labels) return [];
     const arr = Array.isArray(labels) ? labels : [labels];
     return arr
@@ -920,7 +918,7 @@ class CompactPowerCard extends (window.LitElement ||
         return null;
       })
       .filter(Boolean)
-      .slice(0, 2);
+      .slice(0, Math.max(0, max));
   }
 
   _normalizeSources(list) {
@@ -990,7 +988,7 @@ class CompactPowerCard extends (window.LitElement ||
     addEntityConfig(ents.home);
     addEntityConfig(ents.battery);
 
-    const pvLabels = this._normalizeLabels(ents.pv?.labels);
+    const pvLabels = this._normalizeLabels(ents.pv?.labels, 4);
     const gridLabels = this._normalizeLabels(ents.grid?.labels);
     const batteryLabelsSource = Array.isArray(ents.battery)
       ? ents.battery_labels || ents.battery?.labels
@@ -1246,6 +1244,13 @@ class CompactPowerCard extends (window.LitElement ||
     return this._getEntityIcon(entityId, fallback);
   }
 
+  _isPowerDevice(entityId) {
+    if (!entityId) return false;
+    const st = this.hass?.states?.[entityId];
+    const deviceClass = String(st?.attributes?.device_class || "").toLowerCase();
+    return deviceClass === "power";
+  }
+
   _getBatterySocValue(cfg) {
     if (!cfg) return null;
     const entityOverride =
@@ -1387,7 +1392,7 @@ class CompactPowerCard extends (window.LitElement ||
     const useThresholdForCalc = thresholdMode === "calculations";
     const invertGrid = Boolean(gridCfg?.invert_state_values);
     const invertBattery = Boolean(batteryCfg?.invert_state_values);
-    const pvLabels = this._normalizeLabels(pvCfg?.labels);
+    const pvLabels = this._normalizeLabels(pvCfg?.labels, 4);
     const gridLabels = this._normalizeLabels(gridCfg?.labels);
     const batteryLabelsSource = Array.isArray(this._config?.entities?.battery)
       ? this._config?.entities?.battery_labels || this._config?.entities?.battery?.labels
@@ -1460,6 +1465,7 @@ class CompactPowerCard extends (window.LitElement ||
     for (const src of normalizedSources) {
       const entity = src.entity || null;
       const attribute = src.attribute || null;
+      if (!this._isPowerDevice(entity)) continue;
       const srcUnit =
         this.hass?.states?.[entity]?.attributes?.unit_of_measurement ||
         "";
@@ -1948,7 +1954,7 @@ class CompactPowerCard extends (window.LitElement ||
       batteryList.some((b) => Boolean(b?.entity));
     const invertGrid = Boolean(gridCfg?.invert_state_values);
     const invertBattery = Boolean(batteryCfg?.invert_state_values);
-    const pvLabels = this._normalizeLabels(pvCfg?.labels);
+    const pvLabels = this._normalizeLabels(pvCfg?.labels, 4);
     const gridLabels = this._normalizeLabels(gridCfg?.labels);
     const batteryLabelsSource = Array.isArray(this._config?.entities?.battery)
       ? this._config?.entities?.battery_labels || this._config?.entities?.battery?.labels
@@ -2225,6 +2231,7 @@ class CompactPowerCard extends (window.LitElement ||
       const entity = src.entity || null;
       const attribute = src.attribute || null;
       const icon = src.icon || this._getEntityIcon(entity, "mdi:power-plug");
+      const isPowerDevice = this._isPowerDevice(entity);
       const numeric = this._getNumeric(entity, attribute);
       const unit =
         this.hass?.states?.[entity]?.attributes?.unit_of_measurement ||
@@ -2253,10 +2260,12 @@ class CompactPowerCard extends (window.LitElement ||
         leftPct,
         topPct: topPctVal,
         numeric: numericW,
+        isPowerDevice,
       };
     });
     const hasDeviceSources = normalizedSources.length > 0;
     const deviceUsageWatts = sources.reduce((total, src) => {
+      if (!src?.isPowerDevice) return total;
       const val = src?.hidden ? 0 : Math.max(src?.numeric ?? 0, 0);
       return total + val;
     }, 0);
@@ -2271,6 +2280,7 @@ class CompactPowerCard extends (window.LitElement ||
     if (enableDevicePowerLines) {
       deviceLines = sourcePositions.map((pos, idx) => {
         const src = sources[idx];
+        if (!src?.isPowerDevice) return null;
         if (!src) return null;
         const numeric = src.numeric ?? 0;
         const startX = pos.x;
@@ -2289,10 +2299,18 @@ class CompactPowerCard extends (window.LitElement ||
     this.classList.toggle("no-pv", !hasPv);
     this.classList.toggle("no-battery", !hasBattery);
 
-    const pvLabelPositions = [
-      { x: sx(222), anchor: "anchor-right" },
-      { x: sx(290), anchor: "anchor-left" },
-    ];
+    const pvLabelPositions = [];
+    const pvLabelPad = Math.max(16, baseWidth * 0.05);
+    const pvLabelSpacingBase = 56 * (baseWidth / designWidth);
+    const pvLabelSpacing = Math.max(pvLabelSpacingBase, (baseWidth - pvLabelPad * 2) / 10);
+    const pvLabelMax = Math.min(pvLabels.length, 4);
+    for (let i = 0; i < pvLabelMax; i++) {
+      const ring = Math.floor(i / 2) + 1;
+      const dir = i % 2 === 0 ? -1 : 1;
+      const rawX = pvCenterX + dir * pvLabelSpacing * ring;
+      const clampedX = Math.max(pvLabelPad, Math.min(baseWidth - pvLabelPad, rawX));
+      pvLabelPositions.push({ x: clampedX });
+    }
     const pvLabelY = 28;
     const pvLabelItems = pvLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
@@ -2323,7 +2341,6 @@ class CompactPowerCard extends (window.LitElement ||
         hidden,
         leftPct,
         topPct: yPct,
-        anchor: posMeta.anchor,
         numeric: numericW,
       };
     });
@@ -2525,7 +2542,7 @@ class CompactPowerCard extends (window.LitElement ||
           <div class="overlay">
             <!-- grid voltage label removed -->
             ${pvLabelItems.map(
-              (lbl) => html`<div class="overlay-item ${lbl.anchor}" style="left:${lbl.leftPct}%; top:${lbl.topPct}%;">
+              (lbl) => html`<div class="overlay-item" style="left:${lbl.leftPct}%; top:${lbl.topPct}%;">
                 <div class="aux-marker clickable" @click=${() => this._openMoreInfo(lbl.entity || null)}>
                   <ha-icon icon="${lbl.icon}" style="gap: 0px; color:${lbl.color}; opacity:${lbl.opacity}; --mdc-icon-size: calc(18px * var(--cpc-scale, 1)); filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
                   <div class="aux-label" style="margin-top: -6px; padding-bottom: 0px; color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">${renderValue(lbl.val)}</div>

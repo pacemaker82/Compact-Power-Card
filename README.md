@@ -10,7 +10,7 @@ Inspired by the excellent [power flow card plus](https://github.com/flixlix/powe
 
 - Up to 8 device power entities for the home that can help calculate the rest of home usage
 - Up to 6 additional state labels to show related info, like battery %, grid voltage, PV energy or whatever you want.
-- Thresholds can be set on entities to fade out / hide the entity below the threshold.
+- Thresholds can be set on entities to fade out the entity label below the threshold.
 - Home power is calculated by default based on the grid/power/battery. Alternatively, use a home power sensor.
 - Grid & Battery sensors expect +/- values for import/export or charge/discharge. These can be inverted if the default behaviour isn't what you want.
 - Icons, colors and units can be customised.
@@ -69,7 +69,7 @@ This card is designed for the new [Home Assistant Sections UI](https://www.home-
 
 The following rules are always true:
 
-- Thresholds determine the opacity of the icon and labels (faded when below threshold)
+- Thresholds determine the opacity entity label (faded when below threshold)
 - Thresholds determine the animation and appearance of power flow lines (off when below threshold)
 
 However, in `calculations` mode (default):

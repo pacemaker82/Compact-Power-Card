@@ -362,6 +362,10 @@ class CompactPowerCard extends (window.LitElement ||
                       threshold: { 
                         label: "Power Threshold (in watts)",
                         selector: { number: { step: 1, } },
+                      },
+                      force_hide_under_threshold: {
+                        label: "Force hide device when under Threshold?",
+                        selector: { boolean: {} },
                       },                                                                                                        
                     },
                   },
@@ -1853,14 +1857,31 @@ class CompactPowerCard extends (window.LitElement ||
     let homeNeed = Math.max(homeEffectiveFlow, 0);
     let chargeNeed = battCharge;
 
-    // PV → home, then battery charge, then export
-    const pvToHome = Math.min(pvFlow, homeNeed);
-    homeNeed -= pvToHome;
-    let pvRemaining = pvFlow - pvToHome;
-    const pvToBattery = Math.min(pvRemaining, chargeNeed);
-    pvRemaining -= pvToBattery;
-    chargeNeed -= pvToBattery;
-    const pvToGrid = Math.min(pvRemaining, gridExport);
+    const forceCharge = battCharge > 0 && gridImport > 0;
+
+    let pvToHome = 0;
+    let pvToBattery = 0;
+    let pvToGrid = 0;
+
+    if (forceCharge) {
+      // Forced charge: PV charges battery before serving home.
+      pvToBattery = Math.min(pvFlow, chargeNeed);
+      chargeNeed -= pvToBattery;
+      let pvRemaining = pvFlow - pvToBattery;
+      pvToHome = Math.min(pvRemaining, homeNeed);
+      homeNeed -= pvToHome;
+      pvRemaining -= pvToHome;
+      pvToGrid = Math.min(pvRemaining, gridExport);
+    } else {
+      // PV → home, then battery charge, then export
+      pvToHome = Math.min(pvFlow, homeNeed);
+      homeNeed -= pvToHome;
+      let pvRemaining = pvFlow - pvToHome;
+      pvToBattery = Math.min(pvRemaining, chargeNeed);
+      pvRemaining -= pvToBattery;
+      chargeNeed -= pvToBattery;
+      pvToGrid = Math.min(pvRemaining, gridExport);
+    }
 
     // Battery discharge → remaining home, then export (only what PV export didn't cover)
     const batteryToHome = Math.min(battDischarge, homeNeed);
@@ -2400,30 +2421,12 @@ class CompactPowerCard extends (window.LitElement ||
     const sourcePositions = [];
     const homeX = homeCenterX;
     const homeRowYBase = 145; // base Y for aux row; actual Y will be adjusted via pctHomeY
-    const maxDevices = Math.min(normalizedSources.length, 8);
-
-    //
-    if (maxDevices > 0) {
-      // Build outward from the home icon in viewBox coords; keep symmetric spacing and respect padding.
-      const deviceWidth = baseWidth;
-      const pad = Math.max(16, deviceWidth * 0.05);
-      const spacingBase = 56 * (deviceWidth / designWidth); // scale baseline with view width (44 at 512px)
-      const spacing = Math.max(spacingBase, (deviceWidth - pad * 2) / 10); // base spacing; spreads as width grows
-
-      for (let i = 0; i < maxDevices; i++) {
-        const ring = Math.floor(i / 2) + 1; // 1,1,2,2,3,3...
-        const dir = i % 2 === 0 ? -1 : 1; // left, right alternating
-        const rawX = homeX + dir * spacing * ring;
-        const clampedX = Math.max(pad, Math.min(deviceWidth - pad, rawX));
-        sourcePositions.push({ x: clampedX, y: homeRowYBase, leftPct: (clampedX / deviceWidth) * 100 });
-      }
-    }
 
     const deviceFlickerMs = 500;
     const deviceFlickerNow = Date.now();
     if (!this._deviceLineStates) this._deviceLineStates = new Map();
     const nextDeviceStates = new Map();
-    const sources = normalizedSources.map((src, idx) => {
+    const deviceSources = normalizedSources.map((src, idx) => {
       const entity = src.entity || null;
       const switchEntity = src.switch_entity || src.switchEntity || null;
       const attribute = src.attribute || null;
@@ -2440,22 +2443,64 @@ class CompactPowerCard extends (window.LitElement ||
         ? this._formatPowerWithOverride(numericW, decimals, "W", unitOverride ?? null)
         : this._formatEntity(entity, decimals, attribute, unitOverride);
       const color = src.color || homeColor;
-      const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
       const threshold = this._toWatts(this._parseThreshold(src.threshold), "W", true);
       const opacity = this._opacityFor(numericW, threshold);
       const hidden = this._isBelowThreshold(numericW, threshold);
-      const key = entity || `idx-${idx}`;
-      let active = false;
+      const forceHideUnderThreshold = this._coerceBoolean(src.force_hide_under_threshold, false);
       let switchOn = false;
+      if (isPowerDevice && switchEntity) {
+        const swState = this.hass?.states?.[switchEntity]?.state;
+        switchOn = String(swState || "").toLowerCase() === "on";
+      }
+      return {
+        sourceIndex: idx,
+        entity,
+        switchEntity,
+        switchOn,
+        icon,
+        val,
+        color,
+        opacity,
+        hidden,
+        numeric: numericW,
+        isPowerDevice,
+        threshold,
+        forceHideUnderThreshold,
+      };
+    });
+
+    const visibleSources = deviceSources.filter(
+      (src) => !(src.forceHideUnderThreshold && src.hidden)
+    );
+    const maxDevices = Math.min(visibleSources.length, 8);
+
+    if (maxDevices > 0) {
+      // Build outward from the home icon in viewBox coords; keep symmetric spacing and respect padding.
+      const deviceWidth = baseWidth;
+      const pad = Math.max(16, deviceWidth * 0.05);
+      const spacingBase = 56 * (deviceWidth / designWidth); // scale baseline with view width (44 at 512px)
+      const spacing = Math.max(spacingBase, (deviceWidth - pad * 2) / 10); // base spacing; spreads as width grows
+
+      for (let i = 0; i < maxDevices; i++) {
+        const ring = Math.floor(i / 2) + 1; // 1,1,2,2,3,3...
+        const dir = i % 2 === 0 ? -1 : 1; // left, right alternating
+        const rawX = homeX + dir * spacing * ring;
+        const clampedX = Math.max(pad, Math.min(deviceWidth - pad, rawX));
+        sourcePositions.push({ x: clampedX, y: homeRowYBase, leftPct: (clampedX / deviceWidth) * 100 });
+      }
+    }
+
+    const sources = visibleSources.map((src, idx) => {
+      const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
+      const key = src.entity || `idx-${src.sourceIndex}`;
+      let active = false;
       let flicker = false;
       let flickerUntil = 0;
-      if (isPowerDevice) {
-        if (switchEntity) {
-          const swState = this.hass?.states?.[switchEntity]?.state;
-          switchOn = String(swState || "").toLowerCase() === "on";
-          active = switchOn;
+      if (src.isPowerDevice) {
+        if (src.switchEntity) {
+          active = src.switchOn;
         } else {
-          active = numericW > 0 && !hidden;
+          active = src.numeric > 0 && !src.hidden;
         }
         const prevState = this._deviceLineStates.get(key) || {};
         flickerUntil = prevState.flickerUntil || 0;
@@ -2472,25 +2517,16 @@ class CompactPowerCard extends (window.LitElement ||
       const leftPct = pos.leftPct != null ? pos.leftPct : (pos.x / baseWidth) * 100;
       const topPctVal = pctHomeY(pos.y);
       return {
-        entity,
-        switchEntity,
-        switchOn,
-        icon,
-        val,
-        color,
+        ...src,
+        key,
         pos,
-        opacity,
-        hidden,
         leftPct,
         topPct: topPctVal,
-        numeric: numericW,
-        isPowerDevice,
-        key,
         active,
         flicker,
       };
     });
-    const hasDeviceSources = normalizedSources.length > 0;
+    const hasDeviceSources = sources.length > 0;
     const deviceUsageWatts = sources.reduce((total, src) => {
       if (!src?.isPowerDevice) return total;
       const val = src?.hidden ? 0 : Math.max(src?.numeric ?? 0, 0);

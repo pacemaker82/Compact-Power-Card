@@ -179,7 +179,11 @@ class CompactPowerCard extends (window.LitElement ||
                           attribute: { 
                             label: "Entity Attribute",
                             selector: { text: {} },
-                          },                          
+                          },    
+                          name: { 
+                            label: "Name Label",
+                            selector: { text: {} },
+                          },                                                 
                           icon: { 
                             label: "Icon",
                             selector: { icon: {} },
@@ -347,6 +351,10 @@ class CompactPowerCard extends (window.LitElement ||
                           } 
                         },
                       },                                                 
+                      name: {
+                        label: "Device Name",
+                        selector: { text: {} },
+                      },
                       icon: { 
                         label: "Icon",
                         selector: { icon: {} },
@@ -753,6 +761,7 @@ class CompactPowerCard extends (window.LitElement ||
         justify-content: center;
         gap: 2px;
         user-select: none;
+        position: relative;
       }
 
       .aux-marker ha-icon {
@@ -763,14 +772,59 @@ class CompactPowerCard extends (window.LitElement ||
         font-size: calc(12px * var(--cpc-scale, 1));
       }
 
+      .aux-sub-label {
+        font-size: calc(11px * var(--cpc-scale, 1));
+        font-weight: 500;
+        opacity: 0.85;
+        line-height: 1;
+      }
+
+      .pv-label-marker .aux-sub-label {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: -4px;
+        white-space: nowrap;
+      }
+
+      .device-name {
+        font-size: calc(11px * var(--cpc-scale, 1));
+        opacity: 0.85;
+        font-weight: 500;
+        display: inline-block;
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translate(-50%, calc(-100% - (4px * var(--cpc-scale, 1))));
+        pointer-events: none;
+        white-space: normal;
+        text-align: center;
+        width: calc(70px * var(--cpc-scale, 1));
+        max-width: calc(70px * var(--cpc-scale, 1));
+        box-sizing: border-box;
+      }
+
       .pv-label,
       .node-label,
       .home-label,
       .aux-label,
+      .aux-sub-label,
+      .device-name,
       .battery-soc {
         padding: 2px 4px;
         border-radius: 4px;
         white-space: nowrap;
+      }
+
+      .device-name {
+        white-space: normal;
+        overflow-wrap: normal;
+        word-break: normal;
+        hyphens: none;
+        overflow: visible;
+        line-height: 0.9;
+        padding-bottom: 4px;
       }
 
       .clickable {
@@ -809,9 +863,11 @@ class CompactPowerCard extends (window.LitElement ||
         transform: translate(-100%, 0);
       }
 
-      :host(.no-pv) .canvas,
-      ha-card.no-pv .canvas {
-        margin-top: -24px;
+      :host(.no-pv):not(.has-pv-labels) .canvas,
+      ha-card.no-pv:not(.has-pv-labels) .canvas,
+      :host(.no-battery):not(.has-pv-labels) .canvas,
+      ha-card.no-battery:not(.has-pv-labels) .canvas {
+        margin-top: -20px;
       }
 
       :host(.no-battery) #line-pv-battery,
@@ -885,6 +941,7 @@ class CompactPowerCard extends (window.LitElement ||
     if (super.updated) super.updated(changedProps);
     this._adjustLayout();
     this._renderDeviceLines();
+    this._logLayoutSizes();
     const layoutKey = `${this._hostWidth ?? 0}x${this._hostHeight ?? 0}x${this._externalHeight ?? 0}`;
     if (layoutKey !== this._lastFlowLayoutKey) {
       this._lastFlowLayoutKey = layoutKey;
@@ -894,6 +951,22 @@ class CompactPowerCard extends (window.LitElement ||
       this._pendingFlowUpdate = false;
       this._updateFlows();
     }
+  }
+
+  _logLayoutSizes() {
+    const source =
+      this.closest("div.card.fit-rows") ||
+      this.closest("div.card") ||
+      this.parentElement ||
+      this;
+    const styles = getComputedStyle(source);
+    const columnSize = parseFloat(styles.getPropertyValue("--column-size")) || 0;
+    const rowSize = parseFloat(styles.getPropertyValue("--row-size")) || 0;
+    this._columnSize = columnSize;
+    this._rowSize = rowSize;
+    if (columnSize === this._lastColumnSize && rowSize === this._lastRowSize) return;
+    this._lastColumnSize = columnSize;
+    this._lastRowSize = rowSize;
   }
 
   _renderDeviceLines() {
@@ -998,6 +1071,7 @@ class CompactPowerCard extends (window.LitElement ||
     this._resizeObserver.observe(this);
     this._updateScale();
   }
+
 
   disconnectedCallback() {
     if (this._resizeObserver) {
@@ -1108,8 +1182,7 @@ class CompactPowerCard extends (window.LitElement ||
         }
         return null;
       })
-      .filter(Boolean)
-      .slice(0, 8);
+      .filter(Boolean);
   }
 
   _coerceBoolean(val, defaultVal = false) {
@@ -1619,7 +1692,7 @@ class CompactPowerCard extends (window.LitElement ||
     const total = entries.reduce((sum, item) => sum + item.value, 0);
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
     const clampPct = (value) => `${clamp(value, 0, 100)}%`;
-    const blendWidth = 16;
+    const blendWidth = 25;
     const setStop = (el, offset, color) => {
       el.setAttribute("offset", clampPct(offset));
       el.setAttribute("stop-color", color);
@@ -2346,6 +2419,9 @@ class CompactPowerCard extends (window.LitElement ||
     const xScale = baseWidth / designWidth;
     const yScale = baseHeight / designHeight;
     const viewHeight = baseHeight;
+    const rowSize = this._rowSize ?? this._lastRowSize ?? 0;
+    const showDeviceNames = rowSize >= 4;
+    const showPvLabelNames = rowSize >= 4;
     const anchorLeftX = 51.2;
     const sx = (v) => v * xScale;
     const yOffset = 4;
@@ -2638,6 +2714,7 @@ class CompactPowerCard extends (window.LitElement ||
       const entity = src.entity || null;
       const switchEntity = src.switch_entity || src.switchEntity || null;
       const attribute = src.attribute || null;
+      const name = src.name || null;
       const icon = src.icon || this._getEntityIcon(entity, "mdi:power-plug");
       const isPowerDevice = this._isPowerDevice(entity);
       const numeric = this._getNumeric(entity, attribute);
@@ -2653,7 +2730,9 @@ class CompactPowerCard extends (window.LitElement ||
       const color = src.color || homeColor;
       const threshold = this._toWatts(this._parseThreshold(src.threshold), "W", true);
       const opacity = this._opacityFor(numericW, threshold);
-      const hidden = this._isBelowThreshold(numericW, threshold);
+      const hidden =
+        this._isBelowThreshold(numericW, threshold) ||
+        (this._coerceBoolean(src.force_hide_under_threshold, false) && numericW === 0);
       const forceHideUnderThreshold = this._coerceBoolean(src.force_hide_under_threshold, false);
       let switchOn = false;
       if (isPowerDevice && switchEntity) {
@@ -2665,6 +2744,7 @@ class CompactPowerCard extends (window.LitElement ||
         entity,
         switchEntity,
         switchOn,
+        name,
         icon,
         val,
         color,
@@ -2780,9 +2860,11 @@ class CompactPowerCard extends (window.LitElement ||
     this._deviceLineStates = nextDeviceStates;
 
     // Sync host classes for hiding sections
+    const hasPvLabels = pvLabels.length > 0;
     this.classList.toggle("no-pv", !hasPv);
     this.classList.toggle("no-battery", !hasBattery);
     this.classList.toggle("pv-as-battery", pvInBatterySlot);
+    this.classList.toggle("has-pv-labels", hasPvLabels);
 
     const pvLabelPositions = [];
     const pvLabelPad = Math.max(16, baseWidth * 0.05);
@@ -2800,6 +2882,7 @@ class CompactPowerCard extends (window.LitElement ||
     const pvLabelItems = pvLabels.map((lbl, idx) => {
       const entity = lbl.entity || null;
       const attribute = lbl.attribute || null;
+      const name = lbl.name || null;
       const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getLabelIcon(entity, attribute, "mdi:tag-text-outline");
       const color = lbl.color || pvColor;
@@ -2819,6 +2902,7 @@ class CompactPowerCard extends (window.LitElement ||
       const yPct = pctBaseY(pvLabelY); // PV stays fixed in Y
       return {
         entity,
+        name,
         icon,
         color,
         val,
@@ -3021,6 +3105,7 @@ class CompactPowerCard extends (window.LitElement ||
         hasPv ? "" : "no-pv",
         hasBattery ? "" : "no-battery",
         pvInBatterySlot ? "pv-as-battery" : "",
+        pvLabels.length > 0 ? "has-pv-labels" : "",
         layoutReady ? "layout-ready" : "",
       ]
         .filter(Boolean)
@@ -3052,9 +3137,12 @@ class CompactPowerCard extends (window.LitElement ||
             <!-- grid voltage label removed -->
             ${pvLabelItems.map(
               (lbl) => html`<div class="overlay-item" style="left:${lbl.leftPct}%; top:${lbl.topPct}%;">
-                <div class="aux-marker clickable" @click=${() => this._openMoreInfo(lbl.entity || null)}>
+                <div class="aux-marker pv-label-marker clickable" @click=${() => this._openMoreInfo(lbl.entity || null)}>
                   <ha-icon icon="${lbl.icon}" style="gap: 0px; color:${lbl.color}; opacity:1; --mdc-icon-size: calc(18px * var(--cpc-scale, 1)); filter:${!this._isLightTheme() && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"></ha-icon>
                   <div class="aux-label" style="margin-top: -6px; padding-bottom: 0px; color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">${renderValue(lbl.val)}</div>
+                  ${showPvLabelNames && lbl.name
+                    ? html`<div class="aux-sub-label" style="color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">${lbl.name}</div>`
+                    : ""}
                 </div>
               </div>`
             )}
@@ -3190,6 +3278,9 @@ class CompactPowerCard extends (window.LitElement ||
             ${sources.map(
               (src) => html`<div class="overlay-item" style="left:${src.leftPct}%; top:${src.topPct}%; transform: translate(-50%, -50%);">
                 <div class="aux-marker">
+                  ${showDeviceNames && src.name
+                    ? html`<div class="device-name" style="color:${src.color};">${src.name}</div>`
+                    : ""}
                   <span
                     class="device-icon-ring clickable ${src.switchEntity ? "switchable" : ""} ${src.switchOn ? "on" : ""}"
                     style="color:${src.color};"

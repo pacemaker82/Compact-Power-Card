@@ -2,8 +2,7 @@
 
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/total?label=Total%20Downloads) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/pacemaker82/compact-power-card/latest/total?label=Latest%20Version)
 
-
-<img width="1042" height="641" alt="Image" src="https://github.com/user-attachments/assets/6d545c7f-903b-4323-b59c-a074d3404e73" />
+<img width="1043" height="640" alt="Compact Power Card" src="https://github.com/user-attachments/assets/d11672d7-e747-49ed-a144-c783ab9df66e" />
 
 Inspired by the excellent [power flow card plus](https://github.com/flixlix/power-flow-card-plus) - A compact power card for Home Assistant that supports a tighter user experience, and 8 power devices/feeds from the home in a single card. In addition, the card can show 6 entity labels for whatever you want, colour and configure them how you need.
 
@@ -13,6 +12,7 @@ Inspired by the excellent [power flow card plus](https://github.com/flixlix/powe
 - Up to 6 additional state labels to show related info, like battery %, grid voltage, PV energy or whatever you want.
 - Thresholds can be set on entities to fade out the entity label below the threshold.
 - Home power is calculated by default based on the grid/power/battery. Alternatively, use a home power sensor.
+- Home icon dynamically changes colour based on the power provided to it.
 - Grid & Battery sensors expect +/- values for import/export or charge/discharge. These can be inverted if the default behaviour isn't what you want.
 - Icons, colors and units can be customised.
 
@@ -162,6 +162,7 @@ Devices are up to 8 power feeds within your home that you want to show in the ca
 | Device entity           | `entity`                | Sensor/entity id for a load.                                          |
 | Device attribute        | `attribute`             | Read from an attribute instead of state.                                         |
 | Switch Entity        | `switch_entity`             | Will toggle the on/off of the switch when pressing the icon/label.                                         |
+| Name Label            | `name`                  | Show a label for each device. Only works with card set to 4 or more rows in height in the sections UI. [See here](https://github.com/pacemaker82/Compact-Power-Card#managing-the-size-of-the-card) for more                                              |
 | Icon             | `icon`                  | Optional icon for the device badge.                                              |
 | Color            | `color`                 | Optional color override for that device.                                         |
 | Threshold        | `threshold`             | Dims/zeros device below threshold (in watts) (per `threshold_mode`).                        |
@@ -197,6 +198,7 @@ Labels can be used to display "other" information - that can be more power stats
 | Labels list   | `labels`                     | Array (max 4 for PV, max 2 for grid) of label objects.                                             |
 | Label entity  | `entity`            | Sensor/entity id for the label value.                                |
 | Label attribute | `attribute`       | Read from an attribute instead of state.                             |
+| Label name | `name`       | PV only. Add a name to the label. Ensure card is >= 4 rows in height.                              |
 | Icon    | `icon`              | Optional icon shown next to the label.                               |
 | Color   | `color`             | Optional color override for the label text/icon.                     |
 | Threshold | `threshold`       | Dims/hides label when below threshold (per `threshold_mode`).        |

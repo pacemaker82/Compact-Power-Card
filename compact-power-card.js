@@ -414,6 +414,44 @@ class CompactPowerCard extends CompactPowerCardBase {
                       text: {},
                     },
                   },  
+                  { name: "labels",
+                    selector: {
+                      object: {
+                        multiple: true,
+                        label_field: "entity",
+                        fields: {
+                          entity: { 
+                            label: "Label Entity",
+                            selector: { entity: {} },
+                          },
+                          attribute: { 
+                            label: "Entity Attribute",
+                            selector: { text: {} },
+                          },
+                          icon: { 
+                            label: "Icon",
+                            selector: { icon: {} },
+                          },                           
+                          decimal_places: { 
+                            label: "Decimal Places",
+                            selector: { number: {} },
+                          },
+                          unit: { 
+                            label: "Unit of Measurement",
+                            selector: { text: {}},
+                          },      
+                          color: { 
+                            label: "Colour",
+                            selector: { text: {} },
+                          },    
+                          threshold: { 
+                            label: "Threshold",
+                            selector: { number: { step: "any", } },
+                          },                                                                                                           
+                        },
+                      },
+                    },
+                  }, 
                 ]
               },   
               { name: "devices",
@@ -1083,6 +1121,25 @@ class CompactPowerCard extends CompactPowerCardBase {
       .overlay-item.anchor-right-top {
         transform: translate(-100%, 0);
       }
+      
+      .home-label-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+      }
+
+      .home-label-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .home-label-row ha-icon {
+        --mdc-icon-size: calc(14px * var(--cpc-scale, 1));
+      }
 
       :host(.no-pv) .canvas,
       ha-card.no-pv .canvas,
@@ -1656,6 +1713,7 @@ class CompactPowerCard extends CompactPowerCardBase {
 
     const pvLabels = this._normalizeLabels(ents.pv?.labels, null);
     const gridLabels = this._normalizeLabels(ents.grid?.labels, null);
+    const homeLabels = this._normalizeLabels(ents.home?.labels, null);
     const batteryLabelsSource = Array.isArray(ents.battery)
       ? ents.battery_labels || ents.battery?.labels
       : ents.battery?.labels;
@@ -1663,6 +1721,7 @@ class CompactPowerCard extends CompactPowerCardBase {
 
     pvLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
     gridLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
+    homeLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
     batteryLabels.forEach((lbl) => add(this._extractEntityRef(lbl?.entity)));
 
     const batteryList = Array.isArray(ents.battery)
@@ -3148,8 +3207,12 @@ class CompactPowerCard extends CompactPowerCardBase {
       this._getMdiPath(gridIconId) || this._getMdiPath("mdi:transmission-tower");
     const gridLabelsRaw = this._normalizeLabels(gridCfg?.labels, null);
     const batteryLabelsRaw = this._normalizeLabels(batteryLabelsSource, null);
+    const homeLabelsRaw = this._normalizeLabels(homeCfg?.labels, null);
     const hasAnyLabels =
-      pvLabels.length > 0 || gridLabelsRaw.length > 0 || batteryLabelsRaw.length > 0;
+      pvLabels.length > 0 ||
+      gridLabelsRaw.length > 0 ||
+      batteryLabelsRaw.length > 0 ||
+      homeLabelsRaw.length > 0;
     const layout = this._getLayoutMetrics({
       hasPv,
       hasBattery,
@@ -3390,6 +3453,56 @@ class CompactPowerCard extends CompactPowerCardBase {
     const homeColor = this._getColor("home", homeCfg);
     const batteryColor = this._getColor("battery", batteryCfg);
 
+    // --- Home side labels (stacked in the first device slot) ---
+    const homeLabelsLimit =
+      rowCount >= 7 ? 6 : rowCount >= 6 ? 5 : rowCount >= 5 ? 4 : rowCount >= 4 ? 3 : 2;
+    const homeLabels = (homeLabelsRaw || []).slice(0, homeLabelsLimit);
+    const homeLabelItems = homeLabels.map((lbl) => {
+      const entity = lbl.entity || null;
+      const attribute = lbl.attribute || null;
+      const unitOverride = this._getUnitOverride(lbl);
+      const icon = lbl.icon || this._getLabelIcon(entity, attribute, "mdi:tag-text-outline");
+      const color = lbl.color || homeColor;
+
+      const st = entity ? this.hass?.states?.[entity] : null;
+      const raw = attribute ? st?.attributes?.[attribute] : st?.state;
+      const isUnavailable = this._isUnavailableState(raw);
+      const isPowerEntity = this._isPowerDevice(entity);
+      const numeric = isUnavailable ? 0 : this._getNumericMaybe(entity, attribute);
+      const decimals = this._getDecimalPlaces(lbl);
+      const labelUnit =
+        unitOverride ||
+        this.hass?.states?.[entity]?.attributes?.unit_of_measurement ||
+        "";
+      const numericW = isUnavailable ? 0 : this._toWatts(numeric, labelUnit, true);
+      const hasNumeric = isUnavailable ? true : Number.isFinite(isPowerEntity ? numericW : numeric);
+
+      const val = isUnavailable
+        ? "0"
+        : hasNumeric
+        ? isPowerEntity
+          ? this._formatPowerWithOverride(numericW, decimals, "W", unitOverride ?? null)
+          : this._formatEntity(entity, decimals, attribute, unitOverride)
+        : this._formatEntity(entity, decimals, attribute, unitOverride);
+
+      const threshold = this._toWatts(this._parseThreshold(lbl.threshold), "W", true);
+      const opacity =
+        isPowerEntity && hasNumeric ? this._opacityFor(numericW, threshold) : 1;
+      const hidden =
+        isPowerEntity && hasNumeric ? this._isBelowThreshold(numericW, threshold) : false;
+
+      return {
+        entity,
+        icon,
+        color,
+        val,
+        opacity,
+        hidden,
+        numeric: hasNumeric ? (isPowerEntity ? numericW : numeric) : 0,
+      };
+    });
+    const hasHomeValueLabels = homeLabelItems.length > 0;
+
     const pvOpacity = this._opacityFor(pvNumericW, pvThresholdDisplay);
     const gridOpacity = this._opacityFor(gridNumericW, gridThresholdDisplay);
     const homeValueForOpacity = homeCfg?.entity ? homeNumericW : homeEffectiveW;
@@ -3592,7 +3705,10 @@ class CompactPowerCard extends CompactPowerCardBase {
     const maxDevices = Math.min(visibleSources.length, maxItemsByColumns);
     const deviceVisible = visibleSources.slice(0, maxDevices);
 
-    if (maxDevices > 0) {
+    const deviceSlotOffset = hasHomeValueLabels ? 1 : 0;
+    const slotCount = maxDevices + deviceSlotOffset;
+
+    if (slotCount > 0) {
       // Build outward from the home icon in viewBox coords; spacing is driven by column count.
       const deviceWidth = baseWidth;
       const pad = Math.max(16, deviceWidth * 0.05);
@@ -3601,11 +3717,11 @@ class CompactPowerCard extends CompactPowerCardBase {
         columnWidth * 1.5, // 1.5 columns per device slot
         56 * (deviceWidth / designWidth) // keep a sensible minimum spacing on small widths
       );
-      const deviceRings = Math.max(1, Math.ceil(maxDevices / 2));
+      const deviceRings = Math.max(1, Math.ceil(slotCount / 2));
       const maxSpacing = (deviceWidth / 2 - pad) / deviceRings;
       const spacing = Math.max(0, Math.min(spacingBase, maxSpacing));
 
-      for (let ring = 1; sourcePositions.length < maxDevices; ring++) {
+      for (let ring = 1; sourcePositions.length < slotCount; ring++) {
         const leftX = homeX - spacing * ring;
         const rightX = homeX + spacing * ring;
         const clampedLeft = Math.max(pad, Math.min(deviceWidth - pad, leftX));
@@ -3615,7 +3731,7 @@ class CompactPowerCard extends CompactPowerCardBase {
           y: homeRowYBase,
           leftPct: (clampedLeft / deviceWidth) * 100,
         });
-        if (sourcePositions.length < maxDevices) {
+        if (sourcePositions.length < slotCount) {
           sourcePositions.push({
             x: clampedRight,
             y: homeRowYBase,
@@ -3626,8 +3742,10 @@ class CompactPowerCard extends CompactPowerCardBase {
       }
     }
 
+    const reservedHomeLabelPos = hasHomeValueLabels ? (sourcePositions[0] || null) : null;
+
     const sources = deviceVisible.map((src, idx) => {
-      const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
+      const pos = sourcePositions[idx + deviceSlotOffset] || { x: homeX, y: homeRowYBase };
       const key = src.entity || `idx-${src.sourceIndex}`;
       let active = false;
       let flicker = false;
@@ -3677,10 +3795,10 @@ class CompactPowerCard extends CompactPowerCardBase {
     const deviceJunctionTopPct = pctHomeY(homeRowYBase + 26);
     let deviceLines = [];
     if (enableDevicePowerLines) {
-      deviceLines = sourcePositions.map((pos, idx) => {
-        const src = sources[idx];
+      deviceLines = sources.map((src, idx) => {
+        const pos = src?.pos;
         if (!src?.isPowerDevice) return null;
-        if (!src) return null;
+        if (!pos) return null;
         const active = Boolean(src.active);
         const startX = pos.x;
         const startY = syHome(homeRowYBase + 22); // start just below label, anchored to bottom
@@ -4205,6 +4323,29 @@ class CompactPowerCard extends CompactPowerCardBase {
                 <div class="home-label" style="color:${homeColor}; opacity:${homeLabelHidden ? 0.35 : homeOpacity}; ${hasHomeIconOverride ? "margin-top: calc(-8px * var(--cpc-scale, 0.8));" : ""}">${renderValue(homeVal)}</div>
               </div>
             </div>
+            ${hasHomeValueLabels && reservedHomeLabelPos
+              ? html`<div class="overlay-item" style="left:${reservedHomeLabelPos.leftPct}%; top:${pctHomeY(homeRowYBase)}%;">
+                  <div class="home-label-stack">
+                    ${homeLabelItems.map(
+                      (lbl) => html`<div
+                        class="home-label-row clickable"
+                        @click=${(ev) => {
+                          ev.stopPropagation();
+                          this._openMoreInfo(lbl.entity || null);
+                        }}
+                      >
+                        <ha-icon
+                          icon="${lbl.icon}"
+                          style="color:${lbl.color}; opacity:1; filter:${allowGlow && lbl.numeric !== 0 ? `drop-shadow(0 0 8px ${lbl.color})` : "none"};"
+                        ></ha-icon>
+                        <div class="aux-label" style="color:${lbl.color}; opacity:${lbl.hidden ? 0.35 : lbl.opacity};">
+                          ${renderValue(lbl.val)}
+                        </div>
+                      </div>`
+                    )}
+                  </div>
+                </div>`
+              : ""}
             ${enableDevicePowerLines && hasDeviceSources && deviceUsageActive
               ? html`<div class="overlay-item device-power-dot-wrapper" style="left:${(homeCenterX/baseWidth)*100}%; top: calc(${deviceJunctionTopPct}% + 4px);">
                   <div class="device-power-dot ${deviceUsageActive ? "active" : ""}" style="color:${homeColor};${deviceUsageActive ? `animation-duration:${devicePulseSeconds.toFixed(2)}s;` : ""}"></div>

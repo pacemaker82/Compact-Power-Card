@@ -84,7 +84,27 @@ class CompactPowerCard extends CompactPowerCardBase {
               {
                 name: "enable_device_power_lines",
                 selector: { boolean: { } },
-              },              
+              },
+              {
+                name: "show_remaining_device",
+                selector: { boolean: {} },
+              },
+              {
+                name: "remaining_device_name",
+                selector: { text: {} },
+              },
+              {
+                name: "remaining_device_icon",
+                selector: { icon: {} },
+              },
+              {
+                name: "remaining_device_color",
+                selector: { text: {} },
+              },
+              {
+                name: "remaining_device_threshold",
+                selector: { number: { step: 1 } },
+              },
               {
                 name: "disable_home_gradient",
                 selector: { boolean: {} },
@@ -3127,7 +3147,7 @@ class CompactPowerCard extends CompactPowerCardBase {
       ? this._config?.entities?.battery_labels || this._config?.entities?.battery?.labels
       : batteryCfg?.labels;
     const batteryLabels = this._normalizeLabels(batteryLabelsSource, null);
-    const { sources: normalizedSources } = this._getSourcesConfig();
+    let { sources: normalizedSources } = this._getSourcesConfig();
     const enableDevicePowerLines = this._useDevicePowerLines();
     const allowGlow = this._allowGlowEffects();
     const homeGlowOpacity = allowGlow ? 0.3 : 0;
@@ -3369,6 +3389,38 @@ class CompactPowerCard extends CompactPowerCardBase {
       pvUnitRaw || gridUnitRaw || batteryUnitRaw || homeUnitOverride || "W";
     const homeUnit = "W";
     const homeNumericW = this._toWatts(homeNumeric, inferredHomeUnit);
+
+    // Optional virtual device: all household usage not covered by configured devices.
+    if (this._coerceBoolean(this._config?.show_remaining_device, false)) {
+      const knownDeviceWatts = normalizedSources.reduce((sum, src) => {
+        const entity = src?.entity || null;
+        if (!this._isPowerDevice(entity)) return sum;
+        const attribute = src?.attribute || null;
+        const unit = this.hass?.states?.[entity]?.attributes?.unit_of_measurement || "";
+        const meta = this._getPowerMeta(entity, unit, attribute);
+        const watts = Number.isFinite(meta?.watts) ? Math.max(meta.watts, 0) : 0;
+        return sum + watts;
+      }, 0);
+
+      const remainingWatts = Math.max(
+        (Number.isFinite(homeNumericW) ? homeNumericW : 0) - knownDeviceWatts,
+        0
+      );
+
+      normalizedSources = [
+        ...normalizedSources,
+        {
+          entity: "__cpc_remaining_devices__",
+          virtual: true,
+          virtual_watts: remainingWatts,
+          name: this._config?.remaining_device_name || "Overige",
+          icon: this._config?.remaining_device_icon || "mdi:devices",
+          color: this._config?.remaining_device_color || "#9e9e9e",
+          threshold: this._config?.remaining_device_threshold ?? 5,
+          subtract_from_home: false,
+        },
+      ];
+    }
     const homeEffectiveW = this._homeEffective || 0;
     const homeEffectiveRender = homeEffectiveW;
     const homeThresholdDisplay = this._toWatts(this._parseThreshold(homeCfg.threshold), "W", true);
@@ -3534,13 +3586,22 @@ class CompactPowerCard extends CompactPowerCardBase {
       const name = src.name || null;
       const nameEntity = name && this.hass?.states?.[name] ? name : null;
       const displayName = nameEntity ? this._formatEntityStateWithUnit(nameEntity) : name;
-      const icon = src.icon || this._getEntityIcon(entity, "mdi:power-plug");
-      const isPowerDevice = this._isPowerDevice(entity);
-      const st = entity ? this.hass?.states?.[entity] : null;
-      const raw = attribute ? st?.attributes?.[attribute] : st?.state;
-      const isUnavailable = this._isUnavailableState(raw);
-      const numeric = isUnavailable ? 0 : this._getNumericMaybe(entity, attribute);
-      const unit = st?.attributes?.unit_of_measurement || "";
+      const isVirtual = this._coerceBoolean(src.virtual, false);
+      const icon = src.icon || (isVirtual ? "mdi:devices" : this._getEntityIcon(entity, "mdi:power-plug"));
+      const isPowerDevice = isVirtual || this._isPowerDevice(entity);
+      const st = !isVirtual && entity ? this.hass?.states?.[entity] : null;
+      const raw = isVirtual
+        ? src.virtual_watts
+        : attribute
+        ? st?.attributes?.[attribute]
+        : st?.state;
+      const isUnavailable = isVirtual ? false : this._isUnavailableState(raw);
+      const numeric = isVirtual
+        ? Number(src.virtual_watts) || 0
+        : isUnavailable
+        ? 0
+        : this._getNumericMaybe(entity, attribute);
+      const unit = isVirtual ? "W" : st?.attributes?.unit_of_measurement || "";
       const decimals = this._getDecimalPlaces(src);
       const numericW = isPowerDevice
         ? isUnavailable
@@ -3581,6 +3642,7 @@ class CompactPowerCard extends CompactPowerCardBase {
         hidden,
         numeric: hasPowerNumeric ? numericW : numeric ?? 0,
         isPowerDevice,
+        isVirtual,
         threshold,
         forceHideUnderThreshold,
       };
@@ -3589,7 +3651,12 @@ class CompactPowerCard extends CompactPowerCardBase {
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)
     );
-    const maxDevices = Math.min(visibleSources.length, maxItemsByColumns);
+    // Show all configured devices, including the virtual remaining-usage device.
+    // The previous column-based cap could silently remove the last item (usually "Overige").
+    const configuredMaxDevices = this._parseNumberStrict(this._config?.max_device_items);
+    const maxDevices = Number.isFinite(configuredMaxDevices)
+      ? Math.max(1, Math.min(visibleSources.length, Math.floor(configuredMaxDevices)))
+      : visibleSources.length;
     const deviceVisible = visibleSources.slice(0, maxDevices);
 
     if (maxDevices > 0) {
@@ -3628,7 +3695,7 @@ class CompactPowerCard extends CompactPowerCardBase {
 
     const sources = deviceVisible.map((src, idx) => {
       const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
-      const key = src.entity || `idx-${src.sourceIndex}`;
+      const key = src.isVirtual ? "__cpc_remaining_devices__" : src.entity || `idx-${src.sourceIndex}`;
       let active = false;
       let flicker = false;
       let flickerUntil = 0;
@@ -4270,6 +4337,8 @@ class CompactPowerCard extends CompactPowerCardBase {
                     @click=${() => {
                       if (src.switchEntity) {
                         this._toggleDeviceSwitch(src);
+                      } else if (src.isVirtual) {
+                        this._openMoreInfo(homeCfg.entity || null);
                       } else {
                         this._openMoreInfo(src.entity || null);
                       }
@@ -4286,6 +4355,8 @@ class CompactPowerCard extends CompactPowerCardBase {
                     @click=${() => {
                       if (src.switchEntity) {
                         this._toggleDeviceSwitch(src);
+                      } else if (src.isVirtual) {
+                        this._openMoreInfo(homeCfg.entity || null);
                       } else {
                         this._openMoreInfo(src.entity || null);
                       }

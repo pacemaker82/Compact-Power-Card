@@ -70,6 +70,11 @@ This card is designed for the new [Home Assistant Sections UI](https://www.home-
 | Curved Line Radius | `curve_factor`| Adjusts the curve radius. `0` to `5`, `1` is default. Set to `0` for straight lines. |
 | Font Size Multiplier | `font_size_multiplier`| Multiplies text sizes on top of the automatic `--cpc-scale`. Default `1.0`. |
 | Device Power Lines | `show_device_power_lines`| Set to `true` to light up devices when power is flowing beyond a threshold. Default `false` |
+| Remaining Device | `show_remaining_device` | Set to `true` to add a virtual device showing home power not accounted for by configured devices. Default `false`. |
+| Remaining Device Name | `remaining_device_name` | Display name for the remaining device. Default: `Overige`. |
+| Remaining Device Icon | `remaining_device_icon` | MDI icon for the remaining device. Default: `mdi:devices`. |
+| Remaining Device Color | `remaining_device_color` | Color for the remaining device icon and label. Default: `#9e9e9e`. |
+| Remaining Device Threshold | `remaining_device_threshold` | Hides the remaining device when below this threshold in watts. Default: `5`. |
 | Home Icon Gradient | `disable_home_gradient`| Set to `true` if you want the home icon to be a single colour. |
 | Remove Glow Effects | `remove_glow_effects`| Set to `true` to disable drop shadow/glow effects. Default `false` (dark mode only). |
 | Hide Card Background | `hide_card_background`| Set to `true` to hide the standard HA card background. Default `false`. |
@@ -239,6 +244,34 @@ Example below of how devices can be setup:
       attribute: temperature
       unit: "C"
       threshold: 50
+```
+
+## Remaining Device
+
+The remaining device is an optional virtual device that displays the portion of home power consumption not accounted for by configured devices.
+
+Enable it with `show_remaining_device: true` at the card level. The value is calculated as:
+
+`home power − sum of configured device power`
+
+The result is clamped to zero and exists only inside the card — no Home Assistant template sensor is required. When tapped, the remaining device opens the more-info panel of the home entity.
+
+| Name | Setting slug | Default |
+| ---- | ------------ | ------- |
+| Enable | `show_remaining_device` | `false` |
+| Name | `remaining_device_name` | `Overige` |
+| Icon | `remaining_device_icon` | `mdi:devices` |
+| Color | `remaining_device_color` | `#9e9e9e` |
+| Threshold | `remaining_device_threshold` | `5` |
+
+Example:
+
+```yaml
+show_remaining_device: true
+remaining_device_name: Other
+remaining_device_icon: mdi:help-circle
+remaining_device_color: "#9e9e9e"
+remaining_device_threshold: 10
 ```
 
 ## Labels (per pv/grid/battery)

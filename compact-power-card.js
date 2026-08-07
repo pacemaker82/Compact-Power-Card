@@ -4317,23 +4317,23 @@ customElements.define("compact-power-card", CompactPowerCard);
 
 // Register card metadata for the Lovelace card picker
 if (window?.customCards) {
-  const exists = window.customCards.some((c) => c.type === "compact-power-card-dev");
+  const exists = window.customCards.some((c) => c.type === "compact-power-card-original");
   if (!exists) {
     window.customCards.push({
-      type: "compact-power-card-dev",
-      name: "Compact Power Card (Dev - Sorted)",
+      type: "compact-power-card-original",
+      name: "Compact Power Card (Original)",
       preview: true,
-      description: "Compact power flow card with PV, grid, battery, and home flows. Dev version with power sorting.",
+      description: "Compact power flow card with PV, grid, battery, and home flows. Original version.",
       documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
     });
   }
 } else if (window) {
   window.customCards = [
     {
-      type: "compact-power-card-dev",
-      name: "Compact Power Card (Dev - Sorted)",
+      type: "compact-power-card-original",
+      name: "Compact Power Card (Original)",
       preview: true,
-      description: "Compact power flow card with PV, grid, battery, and home flows. Dev version with power sorting.",
+      description: "Compact power flow card with PV, grid, battery, and home flows. Original version.",
       documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
     },
   ];

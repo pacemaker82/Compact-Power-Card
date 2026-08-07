@@ -1,6 +1,6 @@
 {
-  "name": "Compact Power Card",
+  "name": "Compact Power Card DEV",
   "content_in_root": true,
-  "filename": ["compact-power-card.js", "compact-power-card-dev.js"],
+  "filename": "compact-power-card-dev.js",
   "render_readme": true
 }

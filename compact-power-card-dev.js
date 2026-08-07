@@ -4321,20 +4321,20 @@ if (window?.customCards) {
   if (!exists) {
     window.customCards.push({
       type: "compact-power-card-dev",
-      name: "Compact Power Card (Dev - Sorted)",
+      name: "Compact Power Card Dev",
       preview: true,
       description: "Compact power flow card with PV, grid, battery, and home flows. Dev version with power sorting.",
-      documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
+      documentationURL: "https://github.com/AndreRozendaal/Compact-Power-Card-DEV/blob/main/README.md",
     });
   }
 } else if (window) {
   window.customCards = [
     {
       type: "compact-power-card-dev",
-      name: "Compact Power Card (Dev - Sorted)",
+      name: "Compact Power Card Dev",
       preview: true,
       description: "Compact power flow card with PV, grid, battery, and home flows. Dev version with power sorting.",
-      documentationURL: "https://github.com/pacemaker82/Compact-Power-Card/blob/main/README.md",
+      documentationURL: "https://github.com/AndreRozendaal/Compact-Power-Card-DEV/blob/main/README.md",
     },
   ];
 }

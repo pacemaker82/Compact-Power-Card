@@ -97,6 +97,21 @@ class CompactPowerCard extends CompactPowerCardBase {
                 name: "hide_card_background",
                 selector: { boolean: {} },
               },
+              {
+                name: "device_sort",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: [
+                      "none",
+                      "power_desc",
+                      "power_asc",
+                      "name_desc",
+                      "name_asc",
+                    ],
+                  },
+                },
+              },
           ]
         },       
         {
@@ -3537,18 +3552,27 @@ class CompactPowerCard extends CompactPowerCardBase {
       const icon = src.icon || this._getEntityIcon(entity, "mdi:power-plug");
       const isPowerDevice = this._isPowerDevice(entity);
       const st = entity ? this.hass?.states?.[entity] : null;
+      const sortName = displayName || st?.attributes?.friendly_name || entity || "";
       const raw = attribute ? st?.attributes?.[attribute] : st?.state;
       const isUnavailable = this._isUnavailableState(raw);
       const numeric = isUnavailable ? 0 : this._getNumericMaybe(entity, attribute);
       const unit = st?.attributes?.unit_of_measurement || "";
       const decimals = this._getDecimalPlaces(src);
+      const unitOverride = this._getUnitOverride(src);
+      const sortUnit = String(unit || unitOverride || "").trim().toLowerCase();
       const numericW = isPowerDevice
         ? isUnavailable
           ? 0
           : this._toWatts(numeric, unit, true)
         : null;
+      const sortablePowerWatts = isUnavailable
+        ? 0
+        : Number.isFinite(numericW)
+        ? numericW
+        : ["w", "kw", "mw"].includes(sortUnit) && Number.isFinite(numeric)
+        ? this._toWatts(numeric, sortUnit, true)
+        : null;
       const hasPowerNumeric = isPowerDevice && (isUnavailable ? true : Number.isFinite(numericW));
-      const unitOverride = this._getUnitOverride(src);
       let val = hasPowerNumeric
         ? this._formatPowerWithOverride(numericW, decimals, "W", unitOverride ?? null)
         : this._formatEntity(entity, decimals, attribute, unitOverride);
@@ -3574,12 +3598,14 @@ class CompactPowerCard extends CompactPowerCardBase {
         switchEntity,
         switchOn,
         name: displayName,
+        sortName,
         icon,
         val,
         color,
         opacity,
         hidden,
         numeric: hasPowerNumeric ? numericW : numeric ?? 0,
+        sortPower: sortablePowerWatts,
         isPowerDevice,
         threshold,
         forceHideUnderThreshold,
@@ -3589,6 +3615,42 @@ class CompactPowerCard extends CompactPowerCardBase {
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)
     );
+
+    const deviceSort = String(this._config?.device_sort || "").toLowerCase();
+    if (deviceSort !== "none" && deviceSort) {
+      const compareDeviceNames = (a, b) =>
+        String(a.sortName || a.name || a.entity || "").localeCompare(String(b.sortName || b.name || b.entity || ""), undefined, {
+          sensitivity: "base",
+          numeric: true,
+        });
+
+      const getDeviceNumeric = (src) => {
+        const numeric = Number(src?.sortPower ?? src?.numeric ?? 0);
+        return Number.isFinite(numeric) ? numeric : 0;
+      };
+
+      visibleSources.sort((a, b) => {
+        const aNumeric = getDeviceNumeric(a);
+        const bNumeric = getDeviceNumeric(b);
+
+        if (deviceSort === "power_desc") {
+          const diff = bNumeric - aNumeric;
+          return diff !== 0 ? diff : compareDeviceNames(a, b);
+        }
+        if (deviceSort === "power_asc") {
+          const diff = aNumeric - bNumeric;
+          return diff !== 0 ? diff : compareDeviceNames(a, b);
+        }
+        if (deviceSort === "name_desc") {
+          return compareDeviceNames(b, a) || (a.sourceIndex - b.sourceIndex);
+        }
+        if (deviceSort === "name_asc") {
+          return compareDeviceNames(a, b) || (a.sourceIndex - b.sourceIndex);
+        }
+        return 0;
+      });
+    }
+
     const maxDevices = Math.min(visibleSources.length, maxItemsByColumns);
     const deviceVisible = visibleSources.slice(0, maxDevices);
 
@@ -3623,6 +3685,9 @@ class CompactPowerCard extends CompactPowerCardBase {
           });
         }
         if (ring >= deviceRings) break;
+      }
+      if (deviceSort !== "none" && deviceSort) {
+        sourcePositions.sort((a, b) => a.x - b.x);
       }
     }
 

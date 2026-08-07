@@ -3527,8 +3527,7 @@ class CompactPowerCardDev extends CompactPowerCardBase {
     const deviceFlickerNow = Date.now();
     if (!this._deviceLineStates) this._deviceLineStates = new Map();
     const nextDeviceStates = new Map();
-    const deviceSources = normalizedSources
-      .map((src, idx) => {
+    let deviceSources = normalizedSources.map((src, idx) => {
       const entity = src.entity || null;
       const switchEntity = src.switch_entity || src.switchEntity || null;
       const attribute = src.attribute || null;
@@ -3585,14 +3584,36 @@ class CompactPowerCardDev extends CompactPowerCardBase {
         threshold,
         forceHideUnderThreshold,
       };
-      })
-      .sort((a, b) => {
-        const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
-        if (diff !== 0) return diff;
-        const nameA = (a.name || a.entity || "").toString();
-        const nameB = (b.name || b.entity || "").toString();
-        return nameA.localeCompare(nameB);
       });
+
+    // Optional debug logging (enable by adding `debug: true` to card config)
+    try {
+      const debugEnabled = this._config?.debug === true;
+      if (debugEnabled && typeof console !== "undefined") {
+        console.debug("compact-power-card-dev: deviceSources before sort:",
+          deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden })));
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    deviceSources.sort((a, b) => {
+      const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
+      if (diff !== 0) return diff;
+      const nameA = (a.name || a.entity || "").toString();
+      const nameB = (b.name || b.entity || "").toString();
+      return nameA.localeCompare(nameB);
+    });
+
+    try {
+      const debugEnabled = this._config?.debug === true;
+      if (debugEnabled && typeof console !== "undefined") {
+        console.debug("compact-power-card-dev: deviceSources after sort:",
+          deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden })));
+      }
+    } catch (e) {
+      /* ignore */
+    }
 
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)

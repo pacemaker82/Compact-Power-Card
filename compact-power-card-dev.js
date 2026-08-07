@@ -74,6 +74,15 @@ class CompactPowerCardDev extends CompactPowerCardBase {
                 },
               },        
               {
+                name: "device_sort",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: ["none", "power", "name"],
+                  },
+                },
+              },
+              {
                 name: "curve_factor",
                 selector: { number: { min: 0, max: 5, step: 0.5, mode: "slider" } },
               }, 
@@ -3586,13 +3595,22 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       };
       });
 
-    deviceSources.sort((a, b) => {
-      const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
-      if (diff !== 0) return diff;
-      const nameA = (a.name || a.entity || "").toString();
-      const nameB = (b.name || b.entity || "").toString();
-      return nameA.localeCompare(nameB);
-    });
+    const deviceSort = String(this._config?.device_sort || "none").toLowerCase();
+    if (deviceSort === "power") {
+      deviceSources.sort((a, b) => {
+        const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
+        if (diff !== 0) return diff;
+        const nameA = (a.name || a.entity || "").toString();
+        const nameB = (b.name || b.entity || "").toString();
+        return nameA.localeCompare(nameB);
+      });
+    } else if (deviceSort === "name") {
+      deviceSources.sort((a, b) => {
+        const nameA = (a.name || a.entity || "").toString();
+        const nameB = (b.name || b.entity || "").toString();
+        return nameA.localeCompare(nameB);
+      });
+    }
 
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)

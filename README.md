@@ -73,6 +73,7 @@ This card is designed for the new [Home Assistant Sections UI](https://www.home-
 | Home Icon Gradient | `disable_home_gradient`| Set to `true` if you want the home icon to be a single colour. |
 | Remove Glow Effects | `remove_glow_effects`| Set to `true` to disable drop shadow/glow effects. Default `false` (dark mode only). |
 | Hide Card Background | `hide_card_background`| Set to `true` to hide the standard HA card background. Default `false`. |
+| Device Sorting | `device_sort` | Choose device ordering in the card UI: `none` (default, preserve original order), `power` (sort by power descending, then name), or `name` (sort by name ascending). |
 
 ### Thresholds in detail
 

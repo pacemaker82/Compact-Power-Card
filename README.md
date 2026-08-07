@@ -70,6 +70,7 @@ This card is designed for the new [Home Assistant Sections UI](https://www.home-
 | Curved Line Radius | `curve_factor`| Adjusts the curve radius. `0` to `5`, `1` is default. Set to `0` for straight lines. |
 | Font Size Multiplier | `font_size_multiplier`| Multiplies text sizes on top of the automatic `--cpc-scale`. Default `1.0`. |
 | Device Power Lines | `show_device_power_lines`| Set to `true` to light up devices when power is flowing beyond a threshold. Default `false` |
+| Device sort | `device_sort`| Sort visible devices left-to-right. Options: `none`, `power_desc`, `power_asc`, `name_desc`, `name_asc`. Default `none`. |
 | Home Icon Gradient | `disable_home_gradient`| Set to `true` if you want the home icon to be a single colour. |
 | Remove Glow Effects | `remove_glow_effects`| Set to `true` to disable drop shadow/glow effects. Default `false` (dark mode only). |
 | Hide Card Background | `hide_card_background`| Set to `true` to hide the standard HA card background. Default `false`. |
@@ -205,6 +206,8 @@ Devices are power feeds within your home that you want to show in the card. By d
 <img width="746" height="97" alt="Screenshot 2026-01-03 at 07 34 56" src="https://github.com/user-attachments/assets/e19c6c40-aec6-456c-80ac-3b307d663f3b" />
 
 **Important:** You can add as many devices as you want, however the display of them is determined by the card width, 12 columns = up to 8 devices, 24 columns = up to 16 devices. On small screens (phones) this will still be limited to 8 devices, unless in landscape mode where you should have more real estate.
+
+Set the card-level `device_sort` option to order visible devices left-to-right by power or name.
 
 | Name                    | Setting slug                      | What it does                                                                     |
 | ----------------------- | --------------------------------- | -------------------------------------------------------------------------------- |

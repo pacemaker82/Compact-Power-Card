@@ -3586,12 +3586,14 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       };
       });
 
+    // Capture debug snapshot before sort
+    const __cpc_debug_before = deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden }));
+
     // Optional debug logging (enable by adding `debug: true` to card config)
     try {
       const debugEnabled = this._config?.debug === true;
       if (debugEnabled && typeof console !== "undefined") {
-        console.debug("compact-power-card-dev: deviceSources before sort:",
-          deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden })));
+        console.debug("compact-power-card-dev: deviceSources before sort:", __cpc_debug_before);
       }
     } catch (e) {
       /* ignore */
@@ -3604,12 +3606,13 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       const nameB = (b.name || b.entity || "").toString();
       return nameA.localeCompare(nameB);
     });
+    // Capture debug snapshot after sort
+    const __cpc_debug_after = deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden }));
 
     try {
       const debugEnabled = this._config?.debug === true;
       if (debugEnabled && typeof console !== "undefined") {
-        console.debug("compact-power-card-dev: deviceSources after sort:",
-          deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden })));
+        console.debug("compact-power-card-dev: deviceSources after sort:", __cpc_debug_after);
       }
     } catch (e) {
       /* ignore */
@@ -3655,8 +3658,26 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       }
     }
 
-    const sources = deviceVisible.map((src, idx) => {
-      const pos = sourcePositions[idx] || { x: homeX, y: homeRowYBase };
+    // Determine position assignment mode.
+    // By default the original alternating left/right behaviour is preserved.
+    // If card config sets `device_position_mode: "sorted"`, assign positions left->right
+    // according to `x` coordinate so the visual layout matches numeric sorting.
+    const devicePositionMode = String(this._config?.device_position_mode || "alternating");
+    let posOrder = [];
+    if (devicePositionMode === "sorted" && sourcePositions.length) {
+      posOrder = sourcePositions
+        .map((p, i) => ({ i, x: p.x }))
+        .sort((a, b) => a.x - b.x)
+        .map((o) => o.i);
+    }
+
+    // Align sources to positions. If device_position_mode === 'sorted', assign devices
+    // to positions left->right based on x coordinate (posOrder). Otherwise keep natural order.
+    const sourcesAligned = new Array(sourcePositions.length);
+    for (let idx = 0; idx < deviceVisible.length; idx++) {
+      const src = deviceVisible[idx];
+      const assignedIndex = devicePositionMode === "sorted" && posOrder.length ? posOrder[idx] : idx;
+      const pos = sourcePositions[assignedIndex] || { x: homeX, y: homeRowYBase, leftPct: (homeX / baseWidth) * 100 };
       const key = src.entity || `idx-${src.sourceIndex}`;
       let active = false;
       let flicker = false;
@@ -3681,7 +3702,7 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       }
       const leftPct = pos.leftPct != null ? pos.leftPct : (pos.x / baseWidth) * 100;
       const topPctVal = pctHomeY(pos.y);
-      return {
+      sourcesAligned[assignedIndex] = {
         ...src,
         key,
         pos,
@@ -3690,7 +3711,8 @@ class CompactPowerCardDev extends CompactPowerCardBase {
         active,
         flicker,
       };
-    });
+    }
+    const sources = sourcesAligned.filter(Boolean);
     const hasDeviceSources = sources.length > 0;
     const deviceUsageWatts = sources.reduce((total, src) => {
       if (!src?.isPowerDevice) return total;
@@ -4121,6 +4143,12 @@ class CompactPowerCardDev extends CompactPowerCardBase {
                 </div>
               </div>`
             )}
+            ${this._config?.debug
+              ? html`<div class="cpc-debug" style="position:absolute; right:8px; bottom:8px; background: rgba(0,0,0,0.72); color:#fff; padding:8px; font-size:12px; line-height:14px; max-width:360px; max-height:220px; overflow:auto; z-index:1000; border-radius:6px;">
+                  <div style="font-weight:600; margin-bottom:4px;">Debug (dev): devices</div>
+                  <div style="white-space:pre-wrap; font-family:monospace; font-size:11px;">${JSON.stringify({ before: typeof __cpc_debug_before !== 'undefined' ? __cpc_debug_before : [], after: typeof __cpc_debug_after !== 'undefined' ? __cpc_debug_after : [] }, null, 2)}</div>
+                </div>`
+              : ""}
             ${(hasBattery || (pvInBatterySlot && pvLabels.length))
               ? batteryLabelItems.map(
                   (lbl) => html`<div class="overlay-item anchor-right battery-label" style="margin-right: 10px; left:${lbl.xPct}%; top:${lbl.yPx}px;">

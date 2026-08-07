@@ -3527,7 +3527,8 @@ class CompactPowerCard extends CompactPowerCardBase {
     const deviceFlickerNow = Date.now();
     if (!this._deviceLineStates) this._deviceLineStates = new Map();
     const nextDeviceStates = new Map();
-    const deviceSources = normalizedSources.map((src, idx) => {
+    const deviceSources = normalizedSources
+      .map((src, idx) => {
       const entity = src.entity || null;
       const switchEntity = src.switch_entity || src.switchEntity || null;
       const attribute = src.attribute || null;
@@ -3584,7 +3585,14 @@ class CompactPowerCard extends CompactPowerCardBase {
         threshold,
         forceHideUnderThreshold,
       };
-    });
+      })
+      .sort((a, b) => {
+        const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
+        if (diff !== 0) return diff;
+        const nameA = (a.name || a.entity || "").toString();
+        const nameB = (b.name || b.entity || "").toString();
+        return nameA.localeCompare(nameB);
+      });
 
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)

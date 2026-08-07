@@ -3586,19 +3586,6 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       };
       });
 
-    // Capture debug snapshot before sort
-    const __cpc_debug_before = deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden }));
-
-    // Optional debug logging (enable by adding `debug: true` to card config)
-    try {
-      const debugEnabled = this._config?.debug === true;
-      if (debugEnabled && typeof console !== "undefined") {
-        console.debug("compact-power-card-dev: deviceSources before sort:", __cpc_debug_before);
-      }
-    } catch (e) {
-      /* ignore */
-    }
-
     deviceSources.sort((a, b) => {
       const diff = (b.numeric ?? 0) - (a.numeric ?? 0);
       if (diff !== 0) return diff;
@@ -3606,17 +3593,6 @@ class CompactPowerCardDev extends CompactPowerCardBase {
       const nameB = (b.name || b.entity || "").toString();
       return nameA.localeCompare(nameB);
     });
-    // Capture debug snapshot after sort
-    const __cpc_debug_after = deviceSources.map((s) => ({ entity: s.entity, numeric: s.numeric, hidden: s.hidden }));
-
-    try {
-      const debugEnabled = this._config?.debug === true;
-      if (debugEnabled && typeof console !== "undefined") {
-        console.debug("compact-power-card-dev: deviceSources after sort:", __cpc_debug_after);
-      }
-    } catch (e) {
-      /* ignore */
-    }
 
     const visibleSources = deviceSources.filter(
       (src) => !(src.forceHideUnderThreshold && src.hidden)
@@ -4143,12 +4119,7 @@ class CompactPowerCardDev extends CompactPowerCardBase {
                 </div>
               </div>`
             )}
-            ${this._config?.debug
-              ? html`<div class="cpc-debug" style="position:absolute; right:8px; bottom:8px; background: rgba(0,0,0,0.72); color:#fff; padding:8px; font-size:12px; line-height:14px; max-width:360px; max-height:220px; overflow:auto; z-index:1000; border-radius:6px;">
-                  <div style="font-weight:600; margin-bottom:4px;">Debug (dev): devices</div>
-                  <div style="white-space:pre-wrap; font-family:monospace; font-size:11px;">${JSON.stringify({ before: typeof __cpc_debug_before !== 'undefined' ? __cpc_debug_before : [], after: typeof __cpc_debug_after !== 'undefined' ? __cpc_debug_after : [] }, null, 2)}</div>
-                </div>`
-              : ""}
+            ""
             ${(hasBattery || (pvInBatterySlot && pvLabels.length))
               ? batteryLabelItems.map(
                   (lbl) => html`<div class="overlay-item anchor-right battery-label" style="margin-right: 10px; left:${lbl.xPct}%; top:${lbl.yPx}px;">

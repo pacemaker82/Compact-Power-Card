@@ -25,7 +25,7 @@ if (!CompactPowerCardBase || !compactPowerCardHtml || !compactPowerCardCss) {
   );
 }
 
-class CompactPowerCard extends CompactPowerCardBase {
+class CompactPowerCardDev extends CompactPowerCardBase {
 
   static get properties() {
     return {
@@ -4313,7 +4313,7 @@ class CompactPowerCard extends CompactPowerCardBase {
   }
 }
 
-customElements.define("compact-power-card", CompactPowerCard);
+customElements.define("compact-power-card-dev", CompactPowerCardDev);
 
 // Register card metadata for the Lovelace card picker
 if (window?.customCards) {

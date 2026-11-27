@@ -25,6 +25,14 @@ if (!CompactPowerCardBase || !compactPowerCardHtml || !compactPowerCardCss) {
   );
 }
 
+// Home Assistant theme colour names, accepted in YAML (`color: teal`).
+const COMPACT_POWER_CARD_THEME_COLORS = new Set([
+  "primary", "accent", "red", "pink", "purple", "deep-purple", "indigo", "blue",
+  "light-blue", "cyan", "teal", "green", "light-green", "lime", "yellow", "amber",
+  "orange", "deep-orange", "brown", "light-grey", "grey", "dark-grey", "blue-grey",
+  "black", "white", "primary-text", "secondary-text", "disabled",
+]);
+
 class CompactPowerCard extends CompactPowerCardBase {
 
   static get properties() {
@@ -119,7 +127,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                         selector: { number: { step: 1, } },
                       },                     
                       { name: "decimal_places", title: "Decimal Places", selector: { number: {} } },
-                      { name: "color", selector: {text: {} } },
+                      { name: "color", selector: { cpc_color: {} } },
                       {
                         name: "unit",
                         selector: { 
@@ -131,8 +139,23 @@ class CompactPowerCard extends CompactPowerCardBase {
                       },                                         
                     ]
                   },
-                  { name: "invert_state_values", selector: { boolean: {} } },  
-                  { name: "tap_action", 
+                  { name: "invert_state_values", selector: { boolean: {} } },
+                  { name: "",
+                    type: "expandable",
+                    title: "Off-peak Colour",
+                    flatten: true,
+                    schema: [
+                      { name: "offpeak_entity", selector: { entity: {} } },
+                      { name: "",
+                        type: "grid",
+                        schema: [
+                          { name: "offpeak_state", selector: { text: {} } },
+                          { name: "offpeak_color", selector: { cpc_color: {} } },
+                        ]
+                      },
+                    ]
+                  },
+                  { name: "tap_action",
                     selector: { 
                       select: {
                         mode: "dropdown",
@@ -174,7 +197,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                           },      
                           color: { 
                             label: "Colour",
-                            selector: { text: {} },
+                            selector: { cpc_color: {} },
                           },    
                           threshold: { 
                             label: "Threshold",
@@ -200,7 +223,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                         selector: { number: { step: 1, } },
                       },                      
                       { name: "decimal_places", selector: { number: {} } },
-                      { name: "color", selector: {text: {} } },
+                      { name: "color", selector: { cpc_color: {} } },
                       { name: "icon", selector: { icon: {} } },
                       {
                         name: "unit",
@@ -260,7 +283,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                           },      
                           color: { 
                             label: "Colour",
-                            selector: { text: {} },
+                            selector: { cpc_color: {} },
                           },    
                           threshold: { 
                             label: "Threshold",
@@ -313,7 +336,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                       },     
                       color: { 
                         label: "Colour",
-                        selector: { text: {} },
+                        selector: { cpc_color: {} },
                       },    
                       tap_action: {
                         label: "Tap Action",
@@ -364,7 +387,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                       },     
                       color: { 
                         label: "Colour",
-                        selector: { text: {} },
+                        selector: { cpc_color: {} },
                       },    
                       threshold: { 
                         label: "Threshold",
@@ -387,7 +410,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                         name: "threshold", id: "power-threshold", selector: { number: { step: 1, } }
                       },                      
                       { name: "decimal_places", selector: { number: {} } },
-                      { name: "color", selector: {text: {} } },
+                      { name: "color", selector: { cpc_color: {} } },
                       {
                         name: "unit",
                         selector: { 
@@ -458,7 +481,7 @@ class CompactPowerCard extends CompactPowerCardBase {
                       },     
                       color: { 
                         label: "Colour",
-                        selector: { text: {} },
+                        selector: { cpc_color: {} },
                       },    
                       threshold: { 
                         label: "Power Threshold (in watts)",
@@ -489,12 +512,19 @@ class CompactPowerCard extends CompactPowerCardBase {
         if (schema.id === "device-entity") return "Device Power Entity";
         if (schema.id === "pv-entity") return "PV Power Entity";
         if (schema.id === "home-entity") return "Home Power Entity";
+        if (schema.name === "offpeak_entity") return "Off-peak Entity";
+        if (schema.name === "offpeak_state") return "Off-peak State";
+        if (schema.name === "offpeak_color") return "Off-peak Colour";
         return undefined;
       },
       computeHelper: (schema) => {
         switch (schema.name) {
           case "help_text":
-            return "some helpful text";             
+            return "some helpful text";
+          case "offpeak_entity":
+            return "Entity that tells when the off-peak tariff is active (binary_sensor, input_boolean, schedule or a tariff sensor)";
+          case "offpeak_state":
+            return "State meaning off-peak (default: on). Separate several states with commas";
         }
         return undefined;
       },
@@ -1653,6 +1683,7 @@ class CompactPowerCard extends CompactPowerCardBase {
     addEntityConfig(ents.battery);
     add(this._extractEntityRef(ents.grid?.import_entity || ents.grid?.importEntity));
     add(this._extractEntityRef(ents.grid?.export_entity || ents.grid?.exportEntity));
+    add(this._extractEntityRef(ents.grid?.offpeak_entity));
 
     const pvLabels = this._normalizeLabels(ents.pv?.labels, null);
     const gridLabels = this._normalizeLabels(ents.grid?.labels, null);
@@ -1788,12 +1819,45 @@ class CompactPowerCard extends CompactPowerCardBase {
       battery: "var(--energy-battery-in-color)",
     };
 
-    return (
+    if (kind === "grid") {
+      const offpeak = this._getGridOffpeakColor(entityCfg);
+      if (offpeak) return offpeak;
+    }
+
+    return this._resolveColor(
       entityCfg?.color ||
       colors[kind] ||
       cfg[`${kind}_color`] ||
       defaults[kind]
     );
+  }
+
+  // Theme colour names ("red", "primary"...) become
+  // var(--red-color); [r, g, b] arrays become rgb(); any other string is plain CSS.
+  _resolveColor(color) {
+    if (Array.isArray(color) && color.length >= 3) {
+      return `rgb(${color.slice(0, 3).map((c) => Number(c) || 0).join(", ")})`;
+    }
+    if (typeof color !== "string") return color || undefined;
+    const value = color.trim();
+    if (!value || value === "none") return undefined;
+    if (COMPACT_POWER_CARD_THEME_COLORS.has(value)) return `var(--${value}-color)`;
+    return value;
+  }
+
+  _getGridOffpeakColor(gridCfg) {
+    const entityId = this._extractEntityRef(gridCfg?.offpeak_entity);
+    const color = gridCfg?.offpeak_color;
+    if (!entityId || !color) return undefined;
+    const state = this.hass?.states?.[entityId]?.state;
+    if (state === undefined || state === null) return undefined;
+    const raw = gridCfg.offpeak_state;
+    const wanted = (Array.isArray(raw) ? raw : String(raw ?? "").split(","))
+      .map((s) => String(s).trim().toLowerCase())
+      .filter(Boolean);
+    if (!wanted.length) wanted.push("on");
+    if (!wanted.includes(String(state).trim().toLowerCase())) return undefined;
+    return this._resolveColor(color);
   }
 
   _getHeightFactor() {
@@ -3552,7 +3616,7 @@ class CompactPowerCard extends CompactPowerCardBase {
       let val = hasPowerNumeric
         ? this._formatPowerWithOverride(numericW, decimals, "W", unitOverride ?? null)
         : this._formatEntity(entity, decimals, attribute, unitOverride);
-      const color = src.color || homeColor;
+      const color = this._resolveColor(src.color) || homeColor;
       const threshold = isPowerDevice
         ? this._toWatts(this._parseThreshold(src.threshold), "W", true)
         : null;
@@ -3729,7 +3793,7 @@ class CompactPowerCard extends CompactPowerCardBase {
       const attribute = lbl.attribute || null;
       const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getLabelIcon(entity, attribute, "mdi:tag-text-outline");
-      const color = lbl.color || gridColor;
+      const color = this._resolveColor(lbl.color) || gridColor;
       const st = entity ? this.hass?.states?.[entity] : null;
       const raw = attribute ? st?.attributes?.[attribute] : st?.state;
       const isUnavailable = this._isUnavailableState(raw);
@@ -3788,7 +3852,7 @@ class CompactPowerCard extends CompactPowerCardBase {
       const attribute = lbl.attribute || null;
       const unitOverride = this._getUnitOverride(lbl);
       const icon = lbl.icon || this._getLabelIcon(entity, attribute, "mdi:tag-text-outline");
-      const color = lbl.color || batteryLabelDefaultColor;
+      const color = this._resolveColor(lbl.color) || batteryLabelDefaultColor;
       const st = entity ? this.hass?.states?.[entity] : null;
       const raw = attribute ? st?.attributes?.[attribute] : st?.state;
       const isUnavailable = this._isUnavailableState(raw);
@@ -3869,7 +3933,7 @@ class CompactPowerCard extends CompactPowerCardBase {
         const name = lbl.name || null;
         const unitOverride = this._getUnitOverride(lbl);
         const icon = lbl.icon || this._getLabelIcon(entity, attribute, "mdi:tag-text-outline");
-        const color = lbl.color || pvColor;
+        const color = this._resolveColor(lbl.color) || pvColor;
         const st = entity ? this.hass?.states?.[entity] : null;
         const raw = attribute ? st?.attributes?.[attribute] : st?.state;
         const isUnavailable = this._isUnavailableState(raw);
@@ -3930,7 +3994,7 @@ class CompactPowerCard extends CompactPowerCardBase {
               const icon = Number.isFinite(soc)
                 ? this._getBatteryIcon(soc)
                 : cfg.icon || this._getLabelIcon(entity, null, "mdi:battery");
-              const color = cfg.color || batteryColor;
+              const color = this._resolveColor(cfg.color) || batteryColor;
               const numericW = item.raw; // raw value (watts) for direction/opacity
               const stateUnit =
                 item.unit ||
@@ -4303,6 +4367,122 @@ class CompactPowerCard extends CompactPowerCardBase {
   getCardSize() {
     return 2;
   }
+}
+
+// Colour field for the visual editor (`selector: { cpc_color: {} }`): ha-selector
+// renders `ha-selector-<type>` for any type, so the card can ship its own.
+// A text field (paste #FFEA07, a theme name or var(--x)) next to a swatch that
+// opens the full native colour picker. The value stays the string as written.
+const compactPowerCardHexOf = (cssColor) => {
+  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/i.exec(cssColor || "");
+  if (!m || (m[4] !== undefined && parseFloat(m[4]) === 0)) return undefined;
+  return "#" + [m[1], m[2], m[3]].map((c) => Number(c).toString(16).padStart(2, "0")).join("");
+};
+
+class CompactPowerCardColorSelector extends CompactPowerCardBase {
+  static get properties() {
+    return {
+      hass: { attribute: false },
+      selector: { attribute: false },
+      value: {},
+      label: {},
+      helper: {},
+      disabled: { type: Boolean },
+      required: { type: Boolean },
+    };
+  }
+
+  static get styles() {
+    return compactPowerCardCss`
+      :host { display: block; }
+      .row { display: flex; align-items: center; gap: 8px; }
+      ha-selector { flex: 1; min-width: 0; }
+      .swatch {
+        position: relative;
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid var(--divider-color);
+        overflow: hidden;
+        cursor: pointer;
+        background: repeating-conic-gradient(var(--divider-color) 0 25%, transparent 0 50%) 0 0 / 12px 12px;
+      }
+      .fill { position: absolute; inset: 0; background: var(--cpc-swatch, transparent); }
+      input[type="color"] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+      }
+    `;
+  }
+
+  get _text() {
+    if (typeof this.value === "string") return this.value;
+    if (Array.isArray(this.value)) return `rgb(${this.value.slice(0, 3).join(", ")})`;
+    return "";
+  }
+
+  render() {
+    const text = this._text.trim();
+    const css = COMPACT_POWER_CARD_THEME_COLORS.has(text) ? `var(--${text}-color)` : text;
+    return compactPowerCardHtml`
+      <div class="row">
+        <ha-selector
+          .hass=${this.hass}
+          .selector=${{ text: {} }}
+          .value=${this._text}
+          .label=${this.label}
+          .helper=${this.helper}
+          .disabled=${this.disabled}
+          .required=${this.required}
+          @value-changed=${this._textChanged}
+        ></ha-selector>
+        <label class="swatch" style=${`--cpc-swatch: ${css || "transparent"}`}>
+          <span class="fill"></span>
+          <input
+            type="color"
+            aria-label=${this.label || "Colour"}
+            .disabled=${this.disabled}
+            @click=${this._syncPicker}
+            @input=${this._picked}
+          />
+        </label>
+      </div>
+    `;
+  }
+
+  _syncPicker(ev) {
+    // The swatch shows any CSS colour (theme names, var()); read back what the
+    // browser resolved so the picker opens on the current colour.
+    const fill = this.shadowRoot?.querySelector(".fill");
+    if (fill) ev.target.value = compactPowerCardHexOf(getComputedStyle(fill).backgroundColor) || "#000000";
+  }
+
+  _textChanged(ev) {
+    ev.stopPropagation();
+    this._fire((ev.detail.value || "").trim() || undefined);
+  }
+
+  _picked(ev) {
+    this._fire(ev.target.value);
+  }
+
+  _fire(value) {
+    if (value === this.value) return;
+    this.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value }, bubbles: true, composed: true })
+    );
+  }
+}
+
+if (!customElements.get("ha-selector-cpc_color")) {
+  customElements.define("ha-selector-cpc_color", CompactPowerCardColorSelector);
 }
 
 customElements.define("compact-power-card", CompactPowerCard);

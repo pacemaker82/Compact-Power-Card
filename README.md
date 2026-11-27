@@ -100,13 +100,36 @@ Common keys for `pv`, `grid`, `home`, `battery`. The following settings are poss
 | Name                | Setting slug            | What it does                                                                    |
 | ------------------- | ----------------------- | ------------------------------------------------------------------------------- |
 | Entity              | `entity`                | Sensor/entity id used for values.                                               |
-| Color               | `color`                 | Overrides line/icon/text color for that entity.                                 |
+| Color               | `color`                 | Overrides line/icon/text color for that entity. Any CSS colour: hex (`"#ffea07"`), a theme colour name (`teal`, `primary`...), `var(--my-color)`, `rgba(...)`. In the visual editor, type or paste it in the field, or click the swatch to pick from the full colour palette (saved as hex). Empty the field to go back to the default. |
 | Threshold           | `threshold`             | Values below this are zeroed (per `threshold_mode`) and dimmed. A threshold of `0` suppresses `0` and negative values.                 |
 | Decimals            | `decimal_places`        | Number of decimals to display (defaults to card-level `decimal_places`, or 1).                                      |
 | Unit override       | `unit` / `unit_of_measurement` | Converts `W` to `kW` if set to `kW`         |
 | Invert state values | `invert_state_values`   | Flip positive/negative for the grid/battery readings      |
 | Tap Action | `tap_action`   | Set to `more-info` or `navigate`. `navigate` requires a `navigation_path`. Default behaviour is `more-info`     |
 | Navigation Path | `navigation_path`   | Used with `tap_action: navigate`. Set to a local path to go to a dashboard, e.g. `/my-dashboard/page`     |
+
+### Off-peak colour (Grid)
+
+The grid can switch to a second colour while an off-peak tariff is active (icon, value, lines and home gradient). Available in the UI under **Grid > Off-peak Colour**.
+
+| Name                | Setting slug            | What it does                                                                    |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------------- |
+| Off-peak Entity     | `offpeak_entity`        | Entity telling when off-peak is active: `binary_sensor`, `input_boolean`, `schedule`, or a tariff sensor. |
+| Off-peak State      | `offpeak_state`         | State (or comma-separated states / list) meaning off-peak, case-insensitive. Default `on`. |
+| Off-peak Colour     | `offpeak_color`         | Grid colour used while off-peak is active. Same formats as `color`. |
+
+Example:
+
+```yaml
+type: custom:compact-power-card
+entities:
+  grid:
+    entity: sensor.grid_power
+    color: "#488fc2"
+    offpeak_entity: sensor.linky_tariff
+    offpeak_state: "HEURE CREUSE"
+    offpeak_color: teal
+```
 
 ### Separate Entities for Grid or Battery:
 
